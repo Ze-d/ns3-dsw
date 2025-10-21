@@ -1,0 +1,24 @@
+# a,b,rate,delay
+12,13,100Mbps,2ms
+13,14,100Mbps,2ms
+13,6,100Mbps,3ms
+12,6,100Mbps,3ms
+6,11,100Mbps,3ms
+11,10,100Mbps,3ms
+10,9,100Mbps,3ms
+9,14,100Mbps,3ms
+
+1,5,100Mbps,2ms
+1,2,100Mbps,2ms
+#2,1,100Mbps,2ms
+2,5,100Mbps,2ms
+5,4,100Mbps,2ms
+2,3,100Mbps,2ms
+4,3,100Mbps,2ms
+2,4,100Mbps,3ms
+
+# 10
+6,5,10Mbps,5ms
+9,7,10Mbps,5ms
+7,8,10Mbps,5ms
+7,4,10Mbps,5ms
