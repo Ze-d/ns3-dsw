@@ -4,7 +4,7 @@
  *
  * 功能概览：
  * - 从 CSV 读取节点：nodes.csv => id[,x,y[,name]]
- * - 从 CSV 读取链路：links.csv => a,b,rate,delay
+ * - 从 CSV 读取链路：links.csv => a,b,rate[,id]
  * - 支持“按距离自动计算链路时延”：delay = (欧氏距离*meterPerUnit / propSpeed) * delayFactor
  *   可用 --delayByDist=1 开启（默认 1），否则使用 CSV 的 delay
  * - 为每条链路独立设置带宽/时延，按 a->b 的原始方向分配 IP
@@ -83,7 +83,7 @@ struct NodeSpec {
 struct LinkSpec {
   uint32_t a = 0, b = 0;     // 原始方向（用于确定 IP 顺序）
   std::string rate;          // e.g., "100Mbps"
-  std::string delay;         // e.g., "2ms"（当 delayByDist=1 时被忽略）
+  uint32_t id = 0;           // 标识符（可从 CSV 读取，若缺省则自动分配）
 };
 
 // nodes.csv: id[,x,y[,name]]
@@ -120,7 +120,7 @@ static std::vector<NodeSpec> LoadCsvNodes(const std::string& path) {
   return out;
 }
 
-// links.csv: a,b,rate,delay
+// links.csv: a,b,rate[,id]
 static std::vector<LinkSpec> LoadCsvLinks(const std::string& path) {
   std::vector<LinkSpec> links;
   std::ifstream fin(path.c_str());
@@ -131,13 +131,17 @@ static std::vector<LinkSpec> LoadCsvLinks(const std::string& path) {
     if (s.empty() || s[0]=='#') continue;
 
     std::stringstream ss(s);
-    std::string fa, fb, fr, fd;
-    if (!std::getline(ss, fa, ',')) continue;
-    if (!std::getline(ss, fb, ',')) continue;
-    if (!std::getline(ss, fr, ',')) continue;
-    if (!std::getline(ss, fd, ',')) continue;
+    std::vector<std::string> cols;
+    std::string tok;
+    while (std::getline(ss, tok, ',')) {
+      cols.push_back(Trim(tok));
+    }
+    if (cols.size() < 3) {
+      NS_LOG_WARN("Skip invalid link line " << ln << ": " << s);
+      continue;
+    }
 
-    fa = Trim(fa); fb = Trim(fb); fr = Trim(fr); fd = Trim(fd);
+    std::string fa = cols[0], fb = cols[1], fr = cols[2];
 
     if (!std::all_of(fa.begin(), fa.end(), ::isdigit) ||
         !std::all_of(fb.begin(), fb.end(), ::isdigit)) {
@@ -147,10 +151,18 @@ static std::vector<LinkSpec> LoadCsvLinks(const std::string& path) {
     }
 
     LinkSpec ls;
-    ls.a = (uint32_t)std::stoul(fa);
-    ls.b = (uint32_t)std::stoul(fb);
+    ls.a = static_cast<uint32_t>(std::stoul(fa));
+    ls.b = static_cast<uint32_t>(std::stoul(fb));
     ls.rate  = fr;
-    ls.delay = fd; // 可能被忽略（按距离计算时）
+
+    // optional id column (now at index 3)
+    if (cols.size() >= 4 && !cols[3].empty() &&
+        std::all_of(cols[3].begin(), cols[3].end(), ::isdigit)) {
+      ls.id = static_cast<uint32_t>(std::stoul(cols[3]));
+    } else {
+      ls.id = static_cast<uint32_t>(links.size() + 1);
+    }
+
     if (ls.a==0 || ls.b==0 || ls.a==ls.b) {
       NS_LOG_WARN("Skip invalid/self-loop link at line " << ln << ": " << s);
       continue;
@@ -181,6 +193,7 @@ struct IfRecord {
   std::string delay;  // 标签展示（可能是计算值）
   double distanceUnits = 0.0;
   double distanceMeters = 0.0;
+  uint32_t id = 0;    // link id
   Ipv4InterfaceContainer ifc;
 };
 
@@ -217,7 +230,7 @@ static void WriteGraphvizDot(const std::string& path,
     const auto& undirected = kv.first;
     const auto& rec = kv.second;
     dot << "  n" << undirected.first << " -- n" << undirected.second
-        << " [label=\"" << rec.rate << " / " << rec.delay << "\", penwidth=2];\n";
+        << " [label=\"" << rec.rate << " / " << rec.delay << "\", id=\"link" << rec.id << "\", penwidth=2];\n";
   }
   dot << "}\n";
   dot.close();
@@ -247,7 +260,7 @@ int main (int argc, char* argv[])
 
   CommandLine cmd;
   cmd.AddValue("nodes",   "CSV of nodes: id[,x,y[,name]]", nodesCsv);
-  cmd.AddValue("links",   "CSV of links: a,b,rate,delay", linksCsv);
+  cmd.AddValue("links",   "CSV of links: a,b,rate[,id]", linksCsv);
   cmd.AddValue("stop",    "Simulation stop time (s)", stopTime);
   cmd.AddValue("pcap",    "Enable pcap on all links (0/1)", enablePcap);
   cmd.AddValue("anim",    "Enable NetAnim output (0/1)", enableAnim);
@@ -346,7 +359,8 @@ int main (int argc, char* argv[])
     if (delayByDist) {
       p2p.SetChannelAttribute("Delay", TimeValue(Seconds(delaySecComputed)));
     } else {
-      p2p.SetChannelAttribute("Delay", StringValue(l.delay)); // 与旧 CSV 兼容
+      // delay CSV column removed — use a sensible default when not computing by distance
+      p2p.SetChannelAttribute("Delay", TimeValue(MilliSeconds(1)));
     }
     p2p.SetQueue("ns3::DropTailQueue<Packet>", "MaxSize", StringValue("100p"));
 
@@ -355,8 +369,9 @@ int main (int argc, char* argv[])
     Ipv4InterfaceContainer ifc = address.Assign(dev);
     address.NewNetwork();
 
-    std::string delayLabel = delayByDist ? FormatTime(delaySecComputed) : l.delay;
+    std::string delayLabel = delayByDist ? FormatTime(delaySecComputed) : std::string("1ms");
     std::cout << "[link] " << l.a << "<->" << l.b
+              << "  id=" << l.id
               << "  rate=" << l.rate
               << "  delay=" << delayLabel;
     if (delayByDist) {
@@ -373,6 +388,7 @@ int main (int argc, char* argv[])
     IfRecord rec; rec.a = l.a; rec.b = l.b; rec.ifc = ifc;
     rec.rate = l.rate; rec.delay = delayLabel;
     rec.distanceUnits = du; rec.distanceMeters = meters;
+    rec.id = l.id;
     ifMap[undirected] = rec;
   }
 
