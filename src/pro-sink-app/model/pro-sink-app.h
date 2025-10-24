@@ -6,6 +6,7 @@
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/random-variable-stream.h"
+#include "ns3/traced-callback.h" // 包含 TracedCallback
 
 #include <queue>
 #include <vector>
@@ -21,6 +22,10 @@ public:
     virtual ~MySink();
 
     void Setup(double tasksPerSecond, Time simulationStep);
+
+    // TracedCallback: nodeId, taskId, totalCompleted
+    // 当一个任务处理完成时触发
+    TracedCallback<uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
 
 private:
     virtual void StartApplication(void);
@@ -54,6 +59,10 @@ public:
     virtual ~MyProducer();
 
     void Setup(const std::vector<Address>& sinkAddresses, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
+
+    // TracedCallback: nodeId, taskId (totalSent), targetAddress
+    // 当一个新任务开始发送时触发
+    TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
 
 private:
     virtual void StartApplication(void);

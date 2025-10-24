@@ -1,4 +1,4 @@
-#include "pro-sink-app.h" // <-- 确保这里包含了正确的头文件名
+#include "pro-sink-app.h"
 #include "ns3/log.h"
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
@@ -8,7 +8,7 @@
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE("ProSinkApp"); // <-- 日志组件名也更新了
+NS_LOG_COMPONENT_DEFINE("ProSinkApp"); 
 
 // --- 1. MySink 实现 ---
 
@@ -18,6 +18,11 @@ TypeId MySink::GetTypeId(void)
         .SetParent<Application>()
         .SetGroupName("Applications")
         .AddConstructor<MySink>()
+        // 添加 TraceSource
+        .AddTraceSource("TaskCompleted",
+                        "Trace triggered when a task is completed.",
+                        MakeTraceSourceAccessor(&MySink::m_taskCompletedTrace),
+                        "ns3::TracedCallback<uint32_t, uint32_t, uint32_t>")
     ;
     return tid;
 }
@@ -74,7 +79,7 @@ MySink::StopApplication()
     {
         m_socket->SetRecvCallback(Callback<void, Ptr<Socket>>());
     }
-    NS_LOG_UNCOND("消费者应用停止。总共处理任务数: " << m_tasksCompleted << ". 队列中剩余任务数: " << m_taskQueue.size());
+    NS_LOG_UNCOND("消费者应用停止。节点 " << GetNode()->GetId() << " 总共处理任务数: " << m_tasksCompleted << ". 队列中剩余任务数: " << m_taskQueue.size());
 }
 
 void
@@ -108,6 +113,9 @@ MySink::ProcessTasks()
         m_tasksCompleted++;
         m_processingCredit -= 1.0;
         NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 任务 " << taskId << " 处理完成。已完成总数: " << m_tasksCompleted);
+        
+        // 触发 Trace (nodeId, taskId, totalCompleted)
+        m_taskCompletedTrace(GetNode()->GetId(), taskId, m_tasksCompleted);
     }
     if (m_running)
     {
@@ -123,6 +131,11 @@ TypeId MyProducer::GetTypeId(void)
         .SetParent<Application>()
         .SetGroupName("Applications")
         .AddConstructor<MyProducer>()
+        // 添加 TraceSource
+        .AddTraceSource("TaskSent",
+                        "Trace triggered when a new task starts sending.",
+                        MakeTraceSourceAccessor(&MyProducer::m_taskSentTrace),
+                        "ns3::TracedCallback<uint32_t, uint32_t, ns3::Address>")
     ;
     return tid;
 }
@@ -179,7 +192,7 @@ MyProducer::StopApplication()
     {
         m_socket->Close();
     }
-    NS_LOG_UNCOND("生产者应用停止。总共发送任务数: " << m_totalTasksSent << ". 队列中剩余任务数: " << m_taskQueue.size());
+    NS_LOG_UNCOND("生产者应用停止。节点 " << GetNode()->GetId() << " 总共发送任务数: " << m_totalTasksSent << ". 队列中剩余任务数: " << m_taskQueue.size());
 }
 
 void
@@ -230,6 +243,10 @@ MyProducer::SendNextTask()
     int sink_idx = m_sinkSelector->GetInteger();
     m_currentTarget = m_sinkAddresses[sink_idx];
     NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 开始发送任务 " << m_totalTasksSent << " 到 " << InetSocketAddress::ConvertFrom(m_currentTarget).GetIpv4());
+
+    // 触发 Trace (nodeId, taskId (totalSent), targetAddress)
+    m_taskSentTrace(GetNode()->GetId(), m_totalTasksSent, m_currentTarget);
+
     m_packetsSentForCurrentTask = 0;
     SendPacket();
 }
