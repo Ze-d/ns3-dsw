@@ -1,0 +1,41 @@
+graph topo {
+  layout=neato;
+  overlap=false;
+  splines=true;
+  node [shape=circle, style=filled, fontname="Helvetica"];
+
+  n1 [label="1", pos="0,400!", pin=true, fillcolor="#2ca02c"];
+  n2 [label="2", pos="400,0!", pin=true, fillcolor="#1f77b4"];
+  n3 [label="3", pos="1600,0!", pin=true, fillcolor="#1f77b4"];
+  n4 [label="4", pos="1600,400!", pin=true, fillcolor="#1f77b4"];
+  n5 [label="5", pos="400,400!", pin=true, fillcolor="#1f77b4"];
+  n6 [label="6", pos="400,1200!", pin=true, fillcolor="#1f77b4"];
+  n7 [label="7", pos="1600,800!", pin=true, fillcolor="#1f77b4"];
+  n8 [label="8", pos="2000,800!", pin=true, fillcolor="#1f77b4"];
+  n9 [label="9", pos="1600,1200!", pin=true, fillcolor="#1f77b4"];
+  n10 [label="10", pos="1200,1200!", pin=true, fillcolor="#1f77b4"];
+  n11 [label="11", pos="800,1200!", pin=true, fillcolor="#1f77b4"];
+  n12 [label="12", pos="0,1600!", pin=true, fillcolor="#1f77b4"];
+  n13 [label="13", pos="400,1600!", pin=true, fillcolor="#1f77b4"];
+  n14 [label="14", pos="1600,1600!", pin=true, fillcolor="#d62728"];
+
+  n1 -- n2 [label="100Mbps / 1.768ms", id="link10", penwidth=2];
+  n1 -- n5 [label="100Mbps / 1.250ms", id="link9", penwidth=2];
+  n2 -- n3 [label="100Mbps / 3.750ms", id="link14", penwidth=2];
+  n2 -- n4 [label="100Mbps / 3.953ms", id="link16", penwidth=2];
+  n2 -- n5 [label="100Mbps / 1.250ms", id="link12", penwidth=2];
+  n3 -- n4 [label="100Mbps / 1.250ms", id="link15", penwidth=2];
+  n4 -- n5 [label="100Mbps / 3.750ms", id="link13", penwidth=2];
+  n4 -- n7 [label="10Mbps / 1.250ms", id="link20", penwidth=2];
+  n5 -- n6 [label="10Mbps / 2.500ms", id="link17", penwidth=2];
+  n6 -- n11 [label="100Mbps / 1.250ms", id="link5", penwidth=2];
+  n6 -- n12 [label="100Mbps / 1.768ms", id="link4", penwidth=2];
+  n6 -- n13 [label="100Mbps / 1.250ms", id="link3", penwidth=2];
+  n7 -- n8 [label="10Mbps / 1.250ms", id="link19", penwidth=2];
+  n7 -- n9 [label="10Mbps / 1.250ms", id="link18", penwidth=2];
+  n9 -- n10 [label="100Mbps / 1.250ms", id="link7", penwidth=2];
+  n9 -- n14 [label="100Mbps / 1.250ms", id="link8", penwidth=2];
+  n10 -- n11 [label="100Mbps / 1.250ms", id="link6", penwidth=2];
+  n12 -- n13 [label="100Mbps / 1.250ms", id="link1", penwidth=2];
+  n13 -- n14 [label="100Mbps / 3.750ms", id="link2", penwidth=2];
+}
