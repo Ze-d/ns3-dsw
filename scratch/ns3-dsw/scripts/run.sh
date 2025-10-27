@@ -17,7 +17,6 @@
   --flowXml=scratch/ns3-dsw/out/flowmon.xml \
   --pcap=0 \
   --log=info \
-  --consumers=2,6,9 \
   --simulationStep=1.0 \
   --proAppDuration=0.5 \
   --proSinkXml=scratch/ns3-dsw/out/pro_sink_stats.xml"
