@@ -36,11 +36,19 @@ static std::ofstream g_xmlFile;
 
 
 // ----------------------------- 配置结构 -----------------------------
+enum class NodeType {
+    UNKNOWN,
+    PRODUCER, // 生产者 (edge)
+    CONSUMER  // 消费者 (core)
+};
+
 struct NodeSpec {
   uint32_t id = 0;
   bool hasPos = false;
   double x = 0.0, y = 0.0;
-  std::string name; // 可空
+  std::string name;
+  NodeType type = NodeType::UNKNOWN; //Producer or Consumer
+  double appRate = 0.0;     //lambda or consumerRate
 };
 
 struct LinkSpec {
@@ -49,7 +57,7 @@ struct LinkSpec {
   uint32_t id = 0;           // 标识符（可从 CSV 读取，若缺省则自动分配）
 };
 
-// nodes.csv: id[,x,y[,name]]
+// nodes.csv: id,x,y,name,rate
 static std::vector<NodeSpec> LoadCsvNodes(const std::string& path) {
   std::vector<NodeSpec> out;
   std::ifstream fin(path.c_str());
@@ -60,13 +68,15 @@ static std::vector<NodeSpec> LoadCsvNodes(const std::string& path) {
     if (s.empty() || s[0]=='#') continue;
 
     std::stringstream ss(s);
-    std::string fid, fx, fy, fname;
+    std::string fid, fx, fy, fname, frate;
     std::getline(ss, fid, ',');
     std::getline(ss, fx,  ',');
     std::getline(ss, fy,  ',');
-    std::getline(ss, fname); // 可能为空
+    std::getline(ss, fname, ','); 
+    std::getline(ss, frate);
 
-    fid = DswUtils::Trim(fid); fx = DswUtils::Trim(fx); fy = DswUtils::Trim(fy); fname = DswUtils::Trim(fname);
+    fid = DswUtils::Trim(fid); fx = DswUtils::Trim(fx); fy = DswUtils::Trim(fy);
+    fname = DswUtils::Trim(fname); frate = DswUtils::Trim(frate);
 
     if (!std::all_of(fid.begin(), fid.end(), ::isdigit)) {
       if (ln==1) { NS_LOG_WARN("Skip header in nodes.csv: " << s); continue; }
@@ -77,6 +87,32 @@ static std::vector<NodeSpec> LoadCsvNodes(const std::string& path) {
     NodeSpec ns; ns.id = static_cast<uint32_t>(std::stoul(fid));
     if (!fx.empty() && !fy.empty()) { ns.hasPos = true; ns.x = std::stod(fx); ns.y = std::stod(fy); }
     ns.name = fname;
+
+    //解析类型和速率
+    try {
+      if (fname.rfind("edge-", 0) == 0) {
+        ns.type = NodeType::PRODUCER;
+      } else if (fname.rfind("core-", 0) == 0) {
+        ns.type = NodeType::CONSUMER;
+      } else {
+        NS_LOG_WARN("Skip node line " << ln << ": Invalid name '" << fname << "'. Must start with 'edge-' or 'core-'.");
+        continue;
+      }
+
+      if (frate.empty()) {
+        NS_LOG_WARN("Skip node line " << ln << ": Rate column is empty for node " << fid);
+        continue;
+      }
+      ns.appRate = std::stod(frate); // 解析速率
+      if (ns.appRate <= 0.0) {
+        NS_LOG_WARN("Skip node line " << ln << ": Rate must be positive, got " << ns.appRate);
+        continue;
+      }
+    } catch (const std::exception& e) {
+      NS_LOG_WARN("Skip node line " << ln << ": Invalid rate value '" << frate << "' (" << e.what() << ")");
+      continue;
+    }
+
     if (ns.id == 0) { NS_LOG_WARN("Node id 0 is reserved. Skip line " << ln); continue; }
     out.push_back(ns);
   }
@@ -260,8 +296,7 @@ int main (int argc, char* argv[])
   double propSpeed    = 2e8;     // 传播速度 m/s（光纤近似）
   double delayFactor  = 1.0;     // 额外缩放系数
 
-  // --- 新增：Pro-Sink App 参数 ---
-  std::string consumerStr = "2,6,9"; // 默认消费者
+  // --- Pro-Sink App 参数 ---
   double simulationStepMs = 1.0;     // 默认步长 1ms
   double proAppDuration = 0.5;       // 默认运行 0.5s
   std::string proSinkXmlFile = "scratch/pro_sink_stats.xml"; // 默认 XML 输出文件名
@@ -286,7 +321,6 @@ int main (int argc, char* argv[])
   cmd.AddValue("delayFactor", "Extra multiplier for computed delay", delayFactor);
 
   // --- Pro-Sink App 命令行参数 ---
-  cmd.AddValue("consumers", "Comma-separated list of consumer node IDs", consumerStr);
   cmd.AddValue("simulationStep", "Simulation step for Pro-Sink App (ms)", simulationStepMs);
   cmd.AddValue("proAppDuration", "Duration for Pro-Sink App (s)", proAppDuration);
   cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
@@ -295,21 +329,13 @@ int main (int argc, char* argv[])
   SetupLogging(logLevel);
 
   // 确保 XML 输出在 scratch 目录下
-  if (proSinkXmlFile.rfind("scratch/", 0) != 0) { 
-    proSinkXmlFile = "scratch/" + proSinkXmlFile;
+  if (proSinkXmlFile.rfind("scratch/ns3-dsw/out/", 0) != 0) { 
+    proSinkXmlFile = "scratch/ns3-dsw/out/" + proSinkXmlFile;
   }
 
   // 解析消费者列表
+  // --- 解析 Pro-Sink 时间参数 ---
   Time simulationStep = MilliSeconds(simulationStepMs);
-  std::set<uint32_t> consumerNodeIds;
-  std::stringstream ss(consumerStr);
-  std::string segment;
-  while (std::getline(ss, segment, ',')) {
-      if (!DswUtils::Trim(segment).empty()) {
-          consumerNodeIds.insert(std::stoul(DswUtils::Trim(segment)));
-      }
-  }
-  NS_LOG_INFO("Consumer nodes specified: " << consumerStr);
   NS_LOG_INFO("Pro-Sink simulation step: " << simulationStep);
   NS_LOG_INFO("Pro-Sink duration: " << proAppDuration << "s");
 
@@ -318,6 +344,12 @@ int main (int argc, char* argv[])
   auto linkSpecs = LoadCsvLinks(linksCsv);
   if (nodeSpecs.empty()) NS_FATAL_ERROR("No nodes parsed from " << nodesCsv);
   if (linkSpecs.empty()) NS_FATAL_ERROR("No links parsed from " << linksCsv);
+
+  // --- 构建 NodeSpec 映射表 ---
+  std::map<uint32_t, NodeSpec> nodeSpecMap;
+  for (const auto& ns : nodeSpecs) {
+      nodeSpecMap[ns.id] = ns;
+  }
 
   // 节点集合与最大 ID
   std::set<uint32_t> nodeIds;
@@ -443,19 +475,26 @@ int main (int argc, char* argv[])
       }
   }
 
-  uint16_t proPort = 8080; // Pro-Sink App 使用的端口 (必须与 MySink::m_port 匹配)
+ uint16_t proPort = 8080; // Pro-Sink App 使用的端口 (必须与 MySink::m_port 匹配)
   std::vector<Address> sinkAddresses; // 存储所有消费者的地址
-  for (uint32_t consumerId : consumerNodeIds) {
-      if (nodeIpMap.count(consumerId)) {
-          sinkAddresses.push_back(InetSocketAddress(nodeIpMap[consumerId], proPort));
-          NS_LOG_INFO("Consumer " << consumerId << " identified at IP: " << nodeIpMap[consumerId]);
-      } else {
-          NS_LOG_WARN("Specified consumer node " << consumerId << " not found or has no IP.");
+  bool hasProducers = false; 
+
+  // --- 遍历 nodeSpecs 收集消费者地址 ---
+  for (const auto& ns : nodeSpecs) {
+      if (ns.type == NodeType::CONSUMER) {
+          if (nodeIpMap.count(ns.id)) {
+              sinkAddresses.push_back(InetSocketAddress(nodeIpMap[ns.id], proPort));
+              NS_LOG_INFO("Consumer " << ns.id << " (core) identified at IP: " << nodeIpMap[ns.id] << " with rate " << ns.appRate << " Tasks/s ");
+          } else {
+              NS_LOG_WARN("Specified consumer node " << ns.id << " not found or has no IP.");
+          }
+      } else if (ns.type == NodeType::PRODUCER) {
+          hasProducers = true;
       }
   }
 
-  if (sinkAddresses.empty() && nodeIds.size() > consumerNodeIds.size()) {
-      NS_FATAL_ERROR("No valid consumer addresses found, but producers exist. Producers need at least one sink.");
+  if (sinkAddresses.empty() && hasProducers) {
+      NS_FATAL_ERROR("Producers (edge nodes) exist, but no valid consumer (core nodes) addresses were found.");
   }
 
   // 选择服务器子网：优先 (13,14)，否则回退第一条；保持原始方向
@@ -507,8 +546,6 @@ int main (int argc, char* argv[])
   double proAppStopTime = proAppStartTime + proAppDuration;
 
   // Pro-Sink 应用参数 (硬编码)
-  double producerLambda = 10.0;     // (tasks/s)
-  double consumerRate = 100.0;      // (tasks/s)
   uint32_t proTaskSize = 256 * 1024; // (Bytes)
   uint32_t proPacketSize = 1024;     // (Bytes)
 
@@ -518,36 +555,45 @@ int main (int argc, char* argv[])
 
   // 遍历所有节点，安装 Producer 或 Sink
   for (uint32_t nodeId : nodeIds) {
+      // 检查该节点是否在 nodes.csv 中定义过
+      if (nodeSpecMap.count(nodeId) == 0) {
+          NS_LOG_DEBUG("Node " << nodeId << " is router-only (in links.csv but not nodes.csv). Skipping Pro-Sink app.");
+          continue;
+      }
+      
+      const NodeSpec& ns = nodeSpecMap.at(nodeId);
       Ptr<Node> node = nodes.Get(nodeId);
-      if (consumerNodeIds.count(nodeId)) {
+
+      if (ns.type == NodeType::CONSUMER) {
           // 这是消费者 (Sink)
           Ptr<MySink> sinkApp = CreateObject<MySink>();
-          sinkApp->Setup(consumerRate, simulationStep);
+          sinkApp->Setup(ns.appRate, simulationStep); 
           node->AddApplication(sinkApp);
           sinkApp->SetStartTime(Seconds(proAppStartTime));
           sinkApp->SetStopTime(Seconds(proAppStopTime));
           proApps.Add(sinkApp);
           sinks.push_back(sinkApp);
-      } else {
+      } else if (ns.type == NodeType::PRODUCER) {
           // 这是生产者 (Producer)
           if (sinkAddresses.empty()) {
-              NS_LOG_WARN("Node " << nodeId << " is a producer, but no sinks are available. Skipping app installation.");
+              NS_LOG_WARN("Node " << nodeId << " (edge) is a producer, but no sinks are available. Skipping app installation.");
               continue;
           }
           Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
-          producerApp->Setup(sinkAddresses, producerLambda, proTaskSize, proPacketSize, simulationStep);
+          producerApp->Setup(sinkAddresses, ns.appRate, proTaskSize, proPacketSize, simulationStep); // <--- 使用 CSV 速率
           node->AddApplication(producerApp);
           producerApp->SetStartTime(Seconds(proAppStartTime));
           producerApp->SetStopTime(Seconds(proAppStopTime));
           proApps.Add(producerApp);
           producers.push_back(producerApp);
       }
+      // (ns.type == UNKNOWN 的节点会被自动跳过)
   }
   NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size() << " producers.");
   NS_LOG_INFO("Pro-Sink Apps will run from " << proAppStartTime << "s to " << proAppStopTime << "s.");
 
 
-  // --- 新增：打开 XML 文件并连接 Traces ---
+  // --- 打开 XML 文件并连接 Traces ---
   g_xmlFile.open(proSinkXmlFile);
   if (!g_xmlFile.is_open()) {
       NS_LOG_ERROR("Failed to open " << proSinkXmlFile << " for writing.");
