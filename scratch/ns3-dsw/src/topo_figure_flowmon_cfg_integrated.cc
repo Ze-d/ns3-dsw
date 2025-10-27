@@ -1,83 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/**
- * scratch/topo_figure_flowmon_cfg_integrated.cc
- *
- * 功能概览：
- * - 从 CSV 读取节点：nodes.csv => id[,x,y[,name]]
- * - 从 CSV 读取链路：links.csv => a,b,rate[,id]
- * - 支持“按距离自动计算链路时延”：delay = (欧氏距离*meterPerUnit / propSpeed) * delayFactor
- * - 为每条链路独立设置带宽/时延，按 a->b 的原始方向分配 IP
- * - 安装 UDP Echo（自动选择一条链路的 b 端为 server；client 为最小 ID 节点）
- * - 启用 FlowMonitor（XML + 可选 CSV）
- * - NetAnim 可视化（server=红，client=绿，其余=蓝）
- * - Graphviz 导出 .dot（带链路标签：速率/时延；按 CSV 坐标固定布局）
- *
- * - [新增] 集成 MyProducer/MySink 应用 (pro-sink-app)。
- * - [新增] Pro-Sink 应用在 Echo 应用停止后开始运行。
- * - [新增] 将 Pro-Sink 的生产和消费事件通过 Trace 写入 XML 统计文件。
- *
- * 命令行参数：
- * --nodes:           节点 CSV 文件路径 (默认: "scratch/nodes.csv")
- * --links:           链路 CSV 文件路径 (默认: "scratch/links.csv")
- * --stop:            UDP Echo 应用的停止时间 (s) (默认: 20.0)
- * --pcap:            是否启用 Pcap (0/1) (默认: 0)
- * --anim:            是否启用 NetAnim (0/1) (默认: 1)
- * --log:             日志级别 (off|warn|info|debug|all) (默认: "info")
- * --flowXml:         FlowMonitor XML 输出路径 (默认: "topo-figure.perlink.flowmon.xml")
- * --statsCsv:        FlowMonitor CSV 输出路径 (若非空) (默认: "")
- * --animXml:         NetAnim XML 输出路径 (默认: "topo-figure.xml")
- * --dot:             Graphviz .dot 输出路径 (若非空) (默认: "")
- * --dotScale:        Graphviz 坐标缩放 (默认: 80.0)
- * --delayByDist:     是否按距离计算时延 (0/1) (默认: 1)
- * --meterPerUnit:    坐标单位对应的米数 (默认: 50000.0)
- * --propSpeed:       传播速度 m/s (默认: 2e8)
- * --delayFactor:     额外时延缩放 (默认: 1.0)
- * --consumers:       [新增] 消费者节点 ID 列表 (逗号分隔) (默认: "2,6,9")
- * --simulationStep:  [新增] Pro-Sink 应用的仿真步长 (ms) (默认: 1.0)
- * --proAppDuration:  [新增] Pro-Sink 应用的运行总时长 (s) (默认: 0.5)
- * --proSinkXml:      [新增] Pro-Sink 统计 XML 输出路径 (默认: "scratch/pro_sink_stats.xml")
- *
- * 输入文件 (Input):
- * 1. 节点 CSV (由 --nodes 指定)
- * 格式: id[,x,y[,name]]
- * 2. 链路 CSV (由 --links 指定)
- * 格式: a,b,rate[,id]
- *
- * 输出文件 (Output):
- * 1. NetAnim XML (由 --animXml 指定)
- * 2. FlowMonitor XML (由 --flowXml 指定)
- * 3. FlowMonitor CSV (由 --statsCsv 指定, 可选)
- * 4. Graphviz DOT (由 --dot 指定, 可选)
- * 5. Pro-Sink Stats XML (由 --proSinkXml 指定)
- * 6. Pcap 文件 (若 --pcap=1, pcap-<a>-<b>.pcap)
- *
- * 构建：
- * ./ns3 build
- * 运行示例：
-  ./ns3 run "scratch/topo_figure_flowmon_cfg_integrated \
-  --nodes=scratch/nodes.csv \
-  --links=scratch/links.csv \
-  --delayByDist=1 \
-  --meterPerUnit=50000 \
-  --propSpeed=2e8 \
-  --delayFactor=1.0 \
-  --stop=25 \
-  --anim=1 \
-  --animXml=scratch/topo_figure.xml \
-  --dot=scratch/topo.dot \
-  --dotScale=80 \
-  --statsCsv=scratch/flowstats.csv \
-  --flowXml=scratch/flowmon.xml \
-  --pcap=0 \
-  --log=info \
-  --consumers=2,6,9 \
-  --simulationStep=1.0 \
-  --proAppDuration=0.5 \
-  --proSinkXml=pro_sink_stats.xml"
- * 生成图片（需 graphviz）：
- * dot -Tpng scratch/topo_integrated.dot -o scratch/topo_integrated.png
- */
-
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -106,30 +26,14 @@
 #include "ns3/string.h" // 用于 StringValue
 #include "ns3/pro-sink-app.h" 
 
+#include "dswutils.h"
+
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("TopoFigureFlowmonCfg");
 
 static std::ofstream g_xmlFile;
 
-// ----------------------------- 工具函数 -----------------------------
-static inline std::string Trim(const std::string& s) {
-  size_t b = 0, e = s.size();
-  while (b < e && std::isspace(static_cast<unsigned char>(s[b]))) ++b;
-  while (e > b && std::isspace(static_cast<unsigned char>(s[e-1]))) --e;
-  return s.substr(b, e-b);
-}
-static inline std::pair<uint32_t,uint32_t> Key(uint32_t a, uint32_t b) {
-  return std::minmax(a,b); // 无向键
-}
-static inline std::string FormatTime(double sec) {
-  std::ostringstream os; os.setf(std::ios::fixed);
-  if (sec < 1e-6)      { os << std::setprecision(3) << (sec*1e9)  << "ns"; }
-  else if (sec < 1e-3) { os << std::setprecision(3) << (sec*1e6)  << "us"; }
-  else if (sec < 1.0)  { os << std::setprecision(3) << (sec*1e3)  << "ms"; }
-  else                 { os << std::setprecision(3) <<  sec       << "s";  }
-  return os.str();
-}
 
 // ----------------------------- 配置结构 -----------------------------
 struct NodeSpec {
@@ -152,7 +56,7 @@ static std::vector<NodeSpec> LoadCsvNodes(const std::string& path) {
   if (!fin.is_open()) { NS_FATAL_ERROR("Cannot open nodes file: " << path); }
   std::string line; uint32_t ln = 0;
   while (std::getline(fin, line)) {
-    ++ln; std::string s = Trim(line);
+    ++ln; std::string s = DswUtils::Trim(line);
     if (s.empty() || s[0]=='#') continue;
 
     std::stringstream ss(s);
@@ -162,7 +66,7 @@ static std::vector<NodeSpec> LoadCsvNodes(const std::string& path) {
     std::getline(ss, fy,  ',');
     std::getline(ss, fname); // 可能为空
 
-    fid = Trim(fid); fx = Trim(fx); fy = Trim(fy); fname = Trim(fname);
+    fid = DswUtils::Trim(fid); fx = DswUtils::Trim(fx); fy = DswUtils::Trim(fy); fname = DswUtils::Trim(fname);
 
     if (!std::all_of(fid.begin(), fid.end(), ::isdigit)) {
       if (ln==1) { NS_LOG_WARN("Skip header in nodes.csv: " << s); continue; }
@@ -186,14 +90,14 @@ static std::vector<LinkSpec> LoadCsvLinks(const std::string& path) {
   if (!fin.is_open()) { NS_FATAL_ERROR("Cannot open links file: " << path); }
   std::string line; uint32_t ln = 0;
   while (std::getline(fin, line)) {
-    ++ln; std::string s = Trim(line);
+    ++ln; std::string s = DswUtils::Trim(line);
     if (s.empty() || s[0]=='#') continue;
 
     std::stringstream ss(s);
     std::vector<std::string> cols;
     std::string tok;
     while (std::getline(ss, tok, ',')) {
-      cols.push_back(Trim(tok));
+      cols.push_back(DswUtils::Trim(tok));
     }
     if (cols.size() < 3) {
       NS_LOG_WARN("Skip invalid link line " << ln << ": " << s);
@@ -401,8 +305,8 @@ int main (int argc, char* argv[])
   std::stringstream ss(consumerStr);
   std::string segment;
   while (std::getline(ss, segment, ',')) {
-      if (!Trim(segment).empty()) {
-          consumerNodeIds.insert(std::stoul(Trim(segment)));
+      if (!DswUtils::Trim(segment).empty()) {
+          consumerNodeIds.insert(std::stoul(DswUtils::Trim(segment)));
       }
   }
   NS_LOG_INFO("Consumer nodes specified: " << consumerStr);
@@ -469,7 +373,7 @@ int main (int argc, char* argv[])
   std::map<std::pair<uint32_t,uint32_t>, IfRecord> ifMap;
 
   for (const auto& l : linkSpecs) {
-    auto undirected = Key(l.a,l.b);
+    auto undirected = DswUtils::Key(l.a,l.b);
     if (seen.count(undirected)) { NS_LOG_WARN("Duplicate link spec " << l.a << "<->" << l.b << " ignored"); continue; }
     seen.insert(undirected);
 
@@ -498,7 +402,7 @@ int main (int argc, char* argv[])
     Ipv4InterfaceContainer ifc = address.Assign(dev);
     address.NewNetwork();
 
-    std::string delayLabel = delayByDist ? FormatTime(delaySecComputed) : std::string("1ms");
+    std::string delayLabel = delayByDist ? DswUtils::FormatTime(delaySecComputed) : std::string("1ms");
     std::cout << "[link] " << l.a << "<->" << l.b
               << "  id=" << l.id
               << "  rate=" << l.rate
@@ -559,7 +463,7 @@ int main (int argc, char* argv[])
   std::pair<uint32_t,uint32_t> serverKey;
   IfRecord serverRec;
 
-  auto k1314 = Key(13,14);
+  auto k1314 = DswUtils::Key(13,14);
   if (ifMap.count(k1314)) {
     serverKey = k1314; serverRec = ifMap[k1314];
     NS_LOG_INFO("Using (13,14) subnet for server address.");
