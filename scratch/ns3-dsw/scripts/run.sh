@@ -8,7 +8,7 @@
   --meterPerUnit=50000 \
   --propSpeed=2e8 \
   --delayFactor=1.0 \
-  --stop=25 \
+  --proAppStart=0 \
   --anim=1 \
   --animXml=scratch/ns3-dsw/out/topo_figure.xml \
   --dot=scratch/ns3-dsw/out/topo.dot \
