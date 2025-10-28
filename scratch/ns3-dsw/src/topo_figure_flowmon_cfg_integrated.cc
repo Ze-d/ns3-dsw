@@ -362,7 +362,7 @@ main(int argc, char* argv[])
     std::string animXml = "topo-figure.xml";
     std::string dotPath = ""; // 若非空导出 .dot
     double dotScale = 80.0;   // dot 坐标缩放
-    double stopTime = 20.0;   // [修改] 变为 Echo App 的停止时间
+    double proAppStartTime = 0.0; // Pro-Sink App 的启动时间 (s)
     bool enablePcap = false;
     bool enableAnim = true;
 
@@ -380,7 +380,7 @@ main(int argc, char* argv[])
     CommandLine cmd;
     cmd.AddValue("nodes", "CSV of nodes: id[,x,y[,name]]", nodesCsv);
     cmd.AddValue("links", "CSV of links: a,b,rate[,id]", linksCsv);
-    cmd.AddValue("stop", "Simulation stop time (s) for Echo Apps", stopTime); // echo
+    cmd.AddValue("proAppStart", "Pro-Sink App start time (s)", proAppStartTime);
     cmd.AddValue("pcap", "Enable pcap on all links (0/1)", enablePcap);
     cmd.AddValue("anim", "Enable NetAnim output (0/1)", enableAnim);
     cmd.AddValue("log", "Log level: off|warn|info|debug|all", logLevel);
@@ -664,7 +664,6 @@ main(int argc, char* argv[])
     NS_LOG_INFO("Global routes populated.");
 
     // --- 安装 Pro-Sink 应用 ---
-    double proAppStartTime = stopTime; // 在 Echo App 停止后开始
     double proAppStopTime = proAppStartTime + proAppDuration;
 
     // Pro-Sink 应用参数 (硬编码)
@@ -717,7 +716,7 @@ main(int argc, char* argv[])
                                ns.appRate,
                                proTaskSize,
                                proPacketSize,
-                               simulationStep); // <--- 使用 CSV 速率
+                               simulationStep); 
             node->AddApplication(producerApp);
             producerApp->SetStartTime(Seconds(proAppStartTime));
             producerApp->SetStopTime(Seconds(proAppStopTime));
