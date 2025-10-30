@@ -6,12 +6,40 @@
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/random-variable-stream.h"
-#include "ns3/traced-callback.h" // 包含 TracedCallback
+#include "ns3/traced-callback.h"
+#include "ns3/header.h" // 包含 Header
 
 #include <queue>
 #include <vector>
+#include <map>     // 包含 map
+#include <utility> // 包含 pair
 
 namespace ns3 {
+
+// --- 0. 自定义包头 (TaskHeader) 声明 ---
+// 用于在生产者和消费者之间传递任务标识
+class TaskHeader : public Header
+{
+public:
+    static TypeId GetTypeId(void);
+    virtual TypeId GetInstanceTypeId(void) const;
+    virtual uint32_t GetSerializedSize(void) const;
+    virtual void Serialize(Buffer::Iterator start) const;
+    virtual uint32_t Deserialize(Buffer::Iterator start);
+    virtual void Print(std::ostream &os) const;
+
+    TaskHeader();
+    ~TaskHeader();
+
+    void SetData(uint32_t producerId, uint32_t taskId);
+    uint32_t GetProducerId(void) const;
+    uint32_t GetTaskId(void) const;
+
+private:
+    uint32_t m_producerId;
+    uint32_t m_taskId;
+};
+
 
 // --- 1. 自定义消费者应用 (MySink) 声明 ---
 class MySink : public Application
@@ -23,9 +51,9 @@ public:
 
     void Setup(double tasksPerSecond, Time simulationStep);
 
-    // TracedCallback: nodeId, taskId, totalCompleted
+    // TracedCallback: nodeId, producerId, taskId, totalCompleted
     // 当一个任务处理完成时触发
-    TracedCallback<uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
+    TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
 
 private:
     virtual void StartApplication(void);
@@ -37,12 +65,14 @@ private:
     Ptr<Socket> m_socket;
     uint16_t    m_port;
     uint32_t    m_taskSize;
-    uint32_t    m_currentRxBytes;
-    uint32_t    m_nextTaskId;
+
+    // 按 (producerId, taskId) 跟踪接收字节数
+    std::map<std::pair<uint32_t, uint32_t>, uint32_t> m_currentRxBytesPerTask;
 
     Time        m_simulationStep;
     uint32_t    m_tasksCompleted;
-    std::queue<uint32_t> m_taskQueue;
+    // 队列存储 (producerId, taskId)
+    std::queue<std::pair<uint32_t, uint32_t>> m_taskQueue;
 
     double      m_tasksPerSecond;
     double      m_processingCredit;
@@ -80,6 +110,10 @@ private:
     uint32_t    m_packetsSentForCurrentTask;
     uint32_t    m_totalTasksSent;
     bool        m_isSending;
+
+    // 用于添加到包头的当前任务信息
+    uint32_t    m_currentSendingProducerId;
+    uint32_t    m_currentSendingTaskId;
 
     Time m_simulationStep;
     double m_lambda;
