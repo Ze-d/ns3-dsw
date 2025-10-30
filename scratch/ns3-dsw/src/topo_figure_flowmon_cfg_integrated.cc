@@ -312,40 +312,43 @@ WriteGraphvizDot(const std::string& path,
 
 /**
  * @brief 当 Sink 完成一个任务时（Trace 回调）
- * @param nodeId 节点 ID
- * @param taskId 任务 ID
- * @param totalCompleted 该节点累计完成的任务数
+ * @param nodeId 消费者的节点 ID (用于 "Core-Id")
+ * @param producerId 任务来源的生产者 ID (用于 "Edge-Id")
+ * @param taskId 任务的 ID (由生产者分配，用于 "Task-Id")
+ * @param totalCompleted 该消费者节点累计完成的总任务数
  */
 void
-OnSinkTaskCompleted(uint32_t nodeId, uint32_t taskId, uint32_t totalCompleted)
+OnSinkTaskCompleted(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uint32_t totalCompleted)
 {
     if (g_xmlFile.is_open())
     {
-        g_xmlFile << "  <Event type=\"SinkComplete\""
-                  << " time=\"" << Simulator::Now().GetSeconds() << "\""
-                  << " nodeId=\"" << nodeId << "\""
-                  << " taskId=\"" << taskId << "\""
-                  << " totalCompleted=\"" << totalCompleted << "\"/>" << std::endl;
+        g_xmlFile << "  <Event type=\"CoreComp\""
+                  << " Time=\"" << Simulator::Now().GetSeconds() << "\""
+                  << " Core-Id=\"Core-" << nodeId << "\""
+                  << " Edge-Id=\"Edge-" << producerId << "\""
+                  << " Task-Id=\"" << producerId << "-" << taskId << "\""
+                  << " TotalCompleted=\"" << totalCompleted << "\"/>"
+                  << std::endl;
     }
 }
 
+
 /**
  * @brief 当 Producer 发送一个新任务时（Trace 回调）
- * @param nodeId 节点 ID
- * @param taskId 任务 ID (在 App 中是 totalTasksSent)
- * @param target 目标地址 (Address)
+ * @param nodeId 生产者的节点 ID (用于 "Edge-Id")
+ * @param taskId 任务的 ID (在该生产者上是唯一的, 用于 "Task-Id")
+ * @param target 任务发送的目标地址 (用于 "TargetIp")
  */
 void
 OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
 {
     if (g_xmlFile.is_open())
     {
-        g_xmlFile << "  <Event type=\"ProducerSend\""
-                  << " time=\"" << Simulator::Now().GetSeconds() << "\""
-                  << " nodeId=\"" << nodeId << "\""
-                  << " taskId=\"" << taskId << "\"" // 这是 totalTasksSent
-                  << " targetIp=\"" << InetSocketAddress::ConvertFrom(target).GetIpv4() << "\""
-                  << " targetPort=\"" << InetSocketAddress::ConvertFrom(target).GetPort() << "\"/>"
+        g_xmlFile << "  <Event type=\"EdgeSend\""
+                  << " Time=\"" << Simulator::Now().GetSeconds() << "\""
+                  << " Edge-Id=\"Edge-" << nodeId << "\""
+                  << " Task-Id=\"" << nodeId << "-" << taskId << "\""
+                  << " TargetIp=\"" << InetSocketAddress::ConvertFrom(target).GetIpv4() << "\"/>"
                   << std::endl;
     }
 }
@@ -598,34 +601,22 @@ main(int argc, char* argv[])
 
     // --- 构建节点 ID 到 IP 的映射，并收集消费者地址 ---
     // Pro-Sink App 需要知道目标 IP 地址
-    std::map<uint32_t, Ipv4Address> nodeIpMap;
-    uint32_t ipCounter = 2; // 起始 IP 地址为 10.0.0.2
-    for (uint32_t nodeId : nodeIds)
+std::map<uint32_t, Ipv4Address> nodeIpMap;
+for (uint32_t nodeId : nodeIds)
+{
+    if (nodeId == 0) continue; 
+
+    Ptr<Ipv4> ipv4 = nodes.Get(nodeId)->GetObject<Ipv4>();
+    if (ipv4->GetNInterfaces() <= 1)
     {
-        if (nodeId == 0)
-            continue; // 跳过 ID 为 0 的节点（保留作为占位符）
-
-        Ptr<Node> node = nodes.Get(nodeId);
-        Ptr<Ipv4> ipv4 = node->GetObject<Ipv4>();
-
-        // 每个节点分配一个新的 IP 地址
-        std::string ipStr = "10.0.0." + std::to_string(ipCounter);
-        Ipv4Address ip = Ipv4Address(ipStr.c_str());
-
-        // 将分配的 IP 地址存储在映射中
-        nodeIpMap[nodeId] = ip;
-
-        // 更新 IP 地址
-        ipv4->AddAddress(1, Ipv4InterfaceAddress(ip, Ipv4Mask("255.255.255.0")));
-        ipv4->SetUp(1);
-
-        // 增加 IP 地址计数器，确保下一个节点得到不同的地址
-        ipCounter++;
-        if (ipCounter > 16)
-        { // 确保不会超过 10.0.0.16
-            break;
-        }
+        NS_LOG_WARN("Node " << nodeId << " has no P2P interfaces, cannot be reached.");
+        continue;
     }
+    // 使用接口1 (0是loopback) 上的第一个 IP 地址
+    Ipv4Address ip = ipv4->GetAddress(1, 0).GetLocal();
+    nodeIpMap[nodeId] = ip;
+    NS_LOG_DEBUG("Node " << nodeId << " mapped to routable IP: " << ip);
+}
 
     uint16_t proPort = 8080;            // Pro-Sink App 使用的端口 (必须与 MySink::m_port 匹配)
     std::vector<Address> sinkAddresses; // 存储所有消费者的地址
