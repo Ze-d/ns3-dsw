@@ -169,15 +169,15 @@ MySink::StopApplication()
     m_running = false;
     
     // 关闭所有接受的连接
-    for (auto const& socket : m_acceptedSockets)
-    {
-        if (socket != nullptr)
-        {
-            socket->Close();
-        }
-    }
-    m_acceptedSockets.clear();
-    m_socketBuffers.clear();
+    // for (auto const& socket : m_acceptedSockets)
+    // {
+    //     if (socket != nullptr)
+    //     {
+    //         socket->Close();
+    //     }
+    // }
+    // m_acceptedSockets.clear();
+    // m_socketBuffers.clear();
 
     // 关闭监听套接字
     if (m_listenSocket != nullptr)
@@ -186,20 +186,20 @@ MySink::StopApplication()
                                           Callback<void, Ptr<Socket>, const Address&>());
         m_listenSocket->Close();
     }
-    NS_LOG_UNCOND("消费者应用停止。节点 " << GetNode()->GetId() << " 总共处理任务数: " << m_tasksCompleted << ". 队列中剩余任务数: " << m_taskQueue.size());
+    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 停止处理新任务。总共处理任务数: " << m_tasksCompleted << ". 队列中剩余任务数: " << m_taskQueue.size());
 }
 
 bool
 MySink::HandleAccept(Ptr<Socket> socket, const Address& from)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << " accepting connection from " << InetSocketAddress::ConvertFrom(from).GetIpv4());
+    //NS_LOG_INFO("Node " << GetNode()->GetId() << " accepting connection from " << InetSocketAddress::ConvertFrom(from).GetIpv4());
     return true;
 }
 
 void
 MySink::HandleNewConnection(Ptr<Socket> socket, const Address& from)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << " handling new connection from " << InetSocketAddress::ConvertFrom(from).GetIpv4());
+    //NS_LOG_INFO("Node " << GetNode()->GetId() << " handling new connection from " << InetSocketAddress::ConvertFrom(from).GetIpv4());
     
     m_acceptedSockets.push_back(socket);
     m_socketBuffers[socket] = Buffer(); // 为新连接创建缓冲区
@@ -212,14 +212,14 @@ MySink::HandleNewConnection(Ptr<Socket> socket, const Address& from)
 void 
 MySink::HandleNormalClose(Ptr<Socket> socket)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << ": Peer closed connection normally.");
+    //NS_LOG_INFO("Node " << GetNode()->GetId() << ": Peer closed connection normally.");
     CleanupConnection(socket);
 }
 
 void 
 MySink::HandleErrorClose(Ptr<Socket> socket)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << ": Connection closed with error.");
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "Node " << GetNode()->GetId() << ": Connection closed with error.");
     CleanupConnection(socket);
 }
 
@@ -414,15 +414,13 @@ MyProducer::StopApplication()
 {
     m_running = false; // 1. 信号：停止生成新任务和接受新任务
 
-    NS_LOG_UNCOND("生产者应用停止命令。节点 " << GetNode()->GetId() << " 总共发送任务数: " << m_totalTasksSent 
-                  << ". 队列中剩余任务数: " << m_taskQueue.size() 
-                  << ". 是否正在发送: " << (m_isSending ? "是" : "否"));
-
+    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 停止生产新任务, 总共发送任务数: " << m_totalTasksSent 
+                  << ". 队列中剩余任务数: " << m_taskQueue.size());
     // 2. 检查是否可以立即停止
     if (!m_isSending)
     {
         // 当前没有任务在发送，可以安全关闭
-        NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 立即停止 (未在发送)。");
+        //NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 立即停止 (未在发送)。");
         if (m_socket != nullptr && m_connected) // 检查 m_connected 避免在未连接时关闭
         {
             m_socket->Close();
@@ -438,22 +436,22 @@ MyProducer::StopApplication()
 void 
 MyProducer::ConnectionSucceeded(Ptr<Socket> socket)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << " connected to " << InetSocketAddress::ConvertFrom(m_peerAddress).GetIpv4());
-    m_connected = true; // 严格遵守教训 4
+    //NS_LOG_INFO("Node " << GetNode()->GetId() << " connected to " << InetSocketAddress::ConvertFrom(m_peerAddress).GetIpv4());
+    m_connected = true; 
     SendNextTask(); // 尝试发送队列中的任务
 }
 
 void 
 MyProducer::ConnectionFailed(Ptr<Socket> socket)
 {
-    NS_LOG_WARN("Node " << GetNode()->GetId() << " failed to connect to " << InetSocketAddress::ConvertFrom(m_peerAddress).GetIpv4());
+    NS_LOG_WARN(Simulator::Now().GetSeconds() << "Node " << GetNode()->GetId() << " failed to connect to " << InetSocketAddress::ConvertFrom(m_peerAddress).GetIpv4());
     m_connected = false;
 }
 
 void 
 MyProducer::NormalClose(Ptr<Socket> socket)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << ": Connection closed normally.");
+    //NS_LOG_INFO(Simulator::Now().GetSeconds() << "Node " << GetNode()->GetId() << ": Connection closed normally.");
     m_connected = false;
     m_isSending = false;
 }
@@ -461,7 +459,7 @@ MyProducer::NormalClose(Ptr<Socket> socket)
 void 
 MyProducer::ErrorClose(Ptr<Socket> socket)
 {
-    NS_LOG_INFO("Node " << GetNode()->GetId() << ": Connection closed with error.");
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "Node " << GetNode()->GetId() << ": Connection closed with error.");
     m_connected = false;
     m_isSending = false;
 }
@@ -570,7 +568,7 @@ MyProducer::SendPacket()
         if (bytesSent < 0)
         {
             // (与之前相同)
-            NS_LOG_WARN("TCP Send failed with error.");
+            NS_LOG_WARN(Simulator::Now().GetSeconds() << "TCP Send failed with error.");
             return;
         }
         
@@ -578,7 +576,7 @@ MyProducer::SendPacket()
     }
 
     // 任务完成
-    NS_LOG_INFO("Node " << GetNode()->GetId() << " finished sending task " << m_currentSendingProducerId << "-" << m_currentSendingTaskId);
+    //NS_LOG_INFO("Node " << GetNode()->GetId() << " finished sending task " << m_currentSendingProducerId << "-" << m_currentSendingTaskId);
     m_isSending = false;
     
     // 检查是否已请求停止 (m_running == false)
@@ -586,9 +584,12 @@ MyProducer::SendPacket()
     {
         // 软停止：任务已发送完毕，并且 StopApplication 已被调用。
         // 现在可以安全关闭套接字。
-        NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 " 
+        /*
+                NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 " 
                       << m_currentSendingProducerId << "-" << m_currentSendingTaskId
                       << "，现在关闭套接字。");
+        */
+
         if (m_socket != nullptr && m_connected)
         {
             m_socket->Close();

@@ -19,6 +19,4 @@
 --log=info \
 --simulationStep=1.0 \
 --proAppDuration=1.25 \
---proSinkXml=scratch/ns3-dsw/out/pro_sink_stats.xml \
---statsInterval=250 \
---simGracePeriod=0.5"
+--proSinkXml=scratch/ns3-dsw/out/pro_sink_stats.xml"
