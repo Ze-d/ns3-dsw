@@ -14,12 +14,13 @@
 #include "ns3/point-to-point-module.h"
 #include "ns3/pro-sink-app.h"
 #include "ns3/string.h" // 用于 StringValue
+#include "ns3/point-to-point-net-device.h" // 包含 P2PNetDevice 以访问队列
 
 #include <algorithm>
 #include <cctype>
 #include <cmath> // hypot
 #include <fstream>
-#include <iomanip>
+#include <iomanip> // 包含 iomanip 用于 std::setw
 #include <iostream>
 #include <map>
 #include <set>
@@ -32,6 +33,35 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE("TopoFigureFlowmonCfg");
 
 static std::ofstream g_xmlFile;
+
+// Req 3: 用于存储所有被监控链路的队列和元数据
+struct LinkMonitor
+{
+    uint32_t linkId;  // 链路 ID (来自 links.csv)
+    uint32_t nodeIdA; // 链路一端的节点 ID
+    uint32_t nodeIdB; // 链路另一端的节点 ID
+    
+    // 原始的队列监控 (保留)
+    Ptr<Queue<Packet>> queueAtoB; // 节点 A -> B 的队列
+    Ptr<Queue<Packet>> queueBtoA; // 节点 B -> A 的队列
+
+    // --- 【修改】用于带宽统计的字段 ---
+    DataRate linkRate; // 链路的标称速率 (例如 100Mbps)
+    
+    uint64_t totalTxBytesAtoB; // A->B 方向累计发送的字节数
+    uint64_t totalTxBytesBtoA; // B->A 方向累计发送的字节数
+
+    uint64_t lastTxBytesAtoB;  // 上次检查时 A->B 的累计字节数
+    uint64_t lastTxBytesBtoA;  // 上次检查时 B->A 的累计字节数
+};
+
+// 用新结构体替换旧的全局变量
+static std::vector<LinkMonitor> g_monitoredLinks;    
+static const uint32_t g_maxQueuePackets = 10240; // 必须与 P2P 助手设置的 "100p" 匹配
+static Time g_statsInterval; // 将从命令行参数 "statsInterval" 设置
+
+// --- 【新增】跟踪上次统计的时间 ---
+static Time g_lastStatsTime = Seconds(0.0); 
 
 // ----------------------------- 配置结构 -----------------------------
 enum class NodeType
@@ -353,6 +383,113 @@ OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
     }
 }
 
+// --- 【新增】带宽统计 Trace Sinks ---
+
+/**
+ * @brief Trace Sink: 响应 A->B 方向的 PhyTxBegin 事件
+ * @param monitor 指向需要更新的 LinkMonitor 实例
+ * @param packet 正在被发送的数据包
+ */
+static void
+MacTxTraceAtoB(LinkMonitor* monitor, Ptr<const Packet> packet)
+{
+    monitor->totalTxBytesAtoB += packet->GetSize();
+}
+
+/**
+ * @brief Trace Sink: 响应 B->A 方向的 PhyTxBegin 事件
+ * @param monitor 指向需要更新的 LinkMonitor 实例
+ * @param packet 正在被发送的数据包
+ */
+static void
+MacTxTraceBtoA(LinkMonitor* monitor, Ptr<const Packet> packet)
+{
+    monitor->totalTxBytesBtoA += packet->GetSize();
+}
+
+
+// --- 【修改】打印链路利用率报告 ---
+void ReportLinkStats()
+{
+    if (g_monitoredLinks.empty()) return; 
+
+    Time now = Simulator::Now();
+    Time interval = now - g_lastStatsTime;
+
+    // 【修复问题2】只在 interval 为 0 时跳过，允许第一次调用执行
+    if (interval.IsZero())
+    {
+        // 如果 interval 为 0 (例如在同一时间安排了两次)，跳过以避免除零
+        Simulator::Schedule(g_statsInterval, &ReportLinkStats);
+        return;
+    }
+
+    double intervalSeconds = interval.GetSeconds();
+    double linkRateBps = 0.0;
+    double avgUtilAtoB = 0.0;
+    double avgUtilBtoA = 0.0;
+    uint32_t linkCount = g_monitoredLinks.size();
+
+    // 打印报告头
+    NS_LOG_UNCOND("--- Link Utilization Report (" << now.GetSeconds() << "s, Interval: " << intervalSeconds << "s) ---");
+
+    // 迭代器必须是 &link，以便我们可以修改 lastTxBytes... 字段
+    for (auto& link : g_monitoredLinks) 
+    {
+        linkRateBps = link.linkRate.GetBitRate();
+
+        // 1. 计算这个间隔内传输的字节数
+        uint64_t intervalBytesAtoB = link.totalTxBytesAtoB - link.lastTxBytesAtoB;
+        uint64_t intervalBytesBtoA = link.totalTxBytesBtoA - link.lastTxBytesBtoA;
+
+        // 2. 计算比特率 (bps)
+        double bpsAtoB = (intervalBytesAtoB * 8.0) / intervalSeconds;
+        double bpsBtoA = (intervalBytesBtoA * 8.0) / intervalSeconds;
+
+        // 3. 计算占用率 (%)
+        double utilAtoB = (linkRateBps > 0) ? (bpsAtoB / linkRateBps * 100.0) : 0.0;
+        double utilBtoA = (linkRateBps > 0) ? (bpsBtoA / linkRateBps * 100.0) : 0.0;
+        
+        // 打印：将 Mbps 转换为 Mbps
+        double mbpsAtoB = bpsAtoB / 1e6;
+        double mbpsBtoA = bpsBtoA / 1e6;
+
+        std::ostringstream os;
+        os << "  Link " << std::setw(2) << link.linkId 
+           << " (Rate: " << std::setw(3) << (linkRateBps / 1e6) << " Mbps): "
+           << " A(" << std::setw(2) << link.nodeIdA << ")->B(" << std::setw(2) << link.nodeIdB << "): "
+           << std::setw(6) << std::fixed << std::setprecision(2) << mbpsAtoB << " Mbps (" 
+           << std::setw(5) << std::fixed << std::setprecision(1) << utilAtoB << "%) |"
+           // 【修复问题3】为 B->A 添加节点 ID
+           << " B(" << std::setw(2) << link.nodeIdB << ")->A(" << std::setw(2) << link.nodeIdA << "): "
+           << std::setw(6) << std::fixed << std::setprecision(2) << mbpsBtoA << " Mbps (" 
+           << std::setw(5) << std::fixed << std::setprecision(1) << utilBtoA << "%)";
+        NS_LOG_UNCOND(os.str());
+
+        // 4. 为下次计算更新状态
+        link.lastTxBytesAtoB = link.totalTxBytesAtoB;
+        link.lastTxBytesBtoA = link.totalTxBytesBtoA;
+
+        // 累加用于计算全局平均值
+        avgUtilAtoB += utilAtoB;
+        avgUtilBtoA += utilBtoA;
+    }
+
+    // 计算并打印全局平均值
+    double globalAvgUtil = (avgUtilAtoB + avgUtilBtoA) / (linkCount * 2.0);
+
+    NS_LOG_UNCOND("[Network]: Avg Global Utilization: "
+                  << std::fixed << std::setprecision(2)
+                  << globalAvgUtil << "%");
+    NS_LOG_UNCOND("-----------------------------------------------------------------");
+
+    // 更新全局时间
+    g_lastStatsTime = now;
+
+    // 重新安排下一次检查
+    Simulator::Schedule(g_statsInterval, &ReportLinkStats);
+}
+
 // ----------------------------- 主程序 -----------------------------
 int
 main(int argc, char* argv[])
@@ -378,7 +515,11 @@ main(int argc, char* argv[])
     // --- Pro-Sink App 参数 ---
     double simulationStepMs = 1.0;                             // 默认步长 1ms
     double proAppDuration = 0.5;                               // 默认运行 0.5s
+    double simGracePeriod = 0.5;                                // (s) 额外时间，确保所有包被接收
     std::string proSinkXmlFile = "scratch/pro_sink_stats.xml"; // 默认 XML 输出文件名
+
+    // 添加统计周期间隔参数
+    double statsIntervalMs = 250.0; // 默认 250ms
 
     CommandLine cmd;
     cmd.AddValue("nodes", "CSV of nodes: id[,x,y[,name]]", nodesCsv);
@@ -402,7 +543,11 @@ main(int argc, char* argv[])
     // --- Pro-Sink App 命令行参数 ---
     cmd.AddValue("simulationStep", "Simulation step for Pro-Sink App (ms)", simulationStepMs);
     cmd.AddValue("proAppDuration", "Duration for Pro-Sink App (s)", proAppDuration);
+    cmd.AddValue("simGracePeriod", "Extra time for simulator to run after apps stop (s)", simGracePeriod);
     cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
+
+    // --- 统计链路拥堵更新时间 命令行参数 ---
+    cmd.AddValue("statsInterval", "Period for reporting utilization/congestion (ms)", statsIntervalMs);
 
     cmd.Parse(argc, argv);
     SetupLogging(logLevel);
@@ -418,6 +563,10 @@ main(int argc, char* argv[])
     Time simulationStep = MilliSeconds(simulationStepMs);
     NS_LOG_INFO("Pro-Sink simulation step: " << simulationStep);
     NS_LOG_INFO("Pro-Sink duration: " << proAppDuration << "s");
+
+    // 解析统计周期
+    g_statsInterval = MilliSeconds(statsIntervalMs);
+    NS_LOG_INFO("Stats reporting interval: " << g_statsInterval);
 
     // 读取配置
     auto nodeSpecs = LoadCsvNodes(nodesCsv);
@@ -524,6 +673,9 @@ main(int argc, char* argv[])
     std::set<std::pair<uint32_t, uint32_t>> seen; // 去重（无向）
     std::map<std::pair<uint32_t, uint32_t>, IfRecord> ifMap;
 
+    // --- 创建一个 Map 来存储每个节点的链路速率 ---
+    std::map<uint32_t, std::string> nodeLinkRateMap;
+
     for (const auto& l : linkSpecs)
     {
         auto undirected = DswUtils::Key(l.a, l.b);
@@ -533,6 +685,14 @@ main(int argc, char* argv[])
             continue;
         }
         seen.insert(undirected);
+        if (nodeLinkRateMap.count(l.a) == 0)
+        {
+             nodeLinkRateMap[l.a] = l.rate;
+        }
+        if (nodeLinkRateMap.count(l.b) == 0)
+        {
+             nodeLinkRateMap[l.b] = l.rate;
+        }
 
         if (nodeIds.count(l.a) == 0 || nodeIds.count(l.b) == 0)
         {
@@ -557,12 +717,60 @@ main(int argc, char* argv[])
             // delay CSV column removed — use a sensible default when not computing by distance
             p2p.SetChannelAttribute("Delay", TimeValue(MilliSeconds(1)));
         }
-        p2p.SetQueue("ns3::DropTailQueue<Packet>", "MaxSize", StringValue("100p"));
+        // 这里的 "100p" 必须与 g_maxQueuePackets (100) 匹配
+        p2p.SetQueue("ns3::DropTailQueue<Packet>", "MaxSize", StringValue("10240p"));
 
         // 原始方向：a 在前、b 在后 -> IP 地址 index 0 属于 a，index 1 属于 b
         NetDeviceContainer dev = p2p.Install(nodes.Get(l.a), nodes.Get(l.b));
         Ipv4InterfaceContainer ifc = address.Assign(dev);
         address.NewNetwork();
+
+        // 捕获 P2P 队列到新的结构体
+        Ptr<PointToPointNetDevice> devA = DynamicCast<PointToPointNetDevice>(dev.Get(0));
+        Ptr<PointToPointNetDevice> devB = DynamicCast<PointToPointNetDevice>(dev.Get(1));
+
+        LinkMonitor monitorEntry;
+        monitorEntry.linkId = l.id;   // 存储链路 ID
+        monitorEntry.nodeIdA = l.a;   // 存储节点 A
+        monitorEntry.nodeIdB = l.b;   // 存储节点 B
+        
+        // devA 在节点 'a' 上，其 Tx 队列是 A -> B
+        monitorEntry.queueAtoB = devA->GetQueue();  
+        // devB 在节点 'b' 上，其 Tx 队列是 B -> A
+        monitorEntry.queueBtoA = devB->GetQueue();
+        
+        // --- 【修改】存储速率并重置计数器 ---
+        monitorEntry.linkRate = DataRate(l.rate); // 从 string 转换
+        monitorEntry.totalTxBytesAtoB = 0;
+        monitorEntry.totalTxBytesBtoA = 0;
+        monitorEntry.lastTxBytesAtoB = 0;
+        monitorEntry.lastTxBytesBtoA = 0;
+        // --- [修改结束] ---
+
+        g_monitoredLinks.push_back(monitorEntry);
+
+        // --- 【修改】连接跟踪源 ---
+        // 我们必须在 push_back 之后再获取指针，以确保指针指向 vector 中的实际对象
+        LinkMonitor* monitorPtr = &g_monitoredLinks.back();
+
+        // 【修复问题1】使用 Config::ConnectWithoutContext 和 "PhyTxBegin"
+        // devA (在节点 a 上) 的 PhyTxBegin 是 A->B 方向
+        std::ostringstream ossA;
+        ossA << "/NodeList/" << devA->GetNode()->GetId() 
+             << "/DeviceList/" << devA->GetIfIndex()
+             << "/$ns3::PointToPointNetDevice/PhyTxBegin"; // <-- 修正跟踪源
+
+        Config::ConnectWithoutContext(ossA.str(), MakeBoundCallback(&MacTxTraceAtoB, monitorPtr));
+
+        // devB (在节点 b 上) 的 PhyTxBegin 是 B->A 方向
+        std::ostringstream ossB;
+        ossB << "/NodeList/" << devB->GetNode()->GetId() 
+             << "/DeviceList/" << devB->GetIfIndex()
+             << "/$ns3::PointToPointNetDevice/PhyTxBegin"; // <-- 修正跟踪源
+
+        Config::ConnectWithoutContext(ossB.str(), MakeBoundCallback(&MacTxTraceBtoA, monitorPtr));
+        // --- [修改结束] ---
+
 
         std::string delayLabel =
             delayByDist ? DswUtils::FormatTime(delaySecComputed) : std::string("1ms");
@@ -656,6 +864,7 @@ for (uint32_t nodeId : nodeIds)
 
     // --- 安装 Pro-Sink 应用 ---
     double proAppStopTime = proAppStartTime + proAppDuration;
+    double simulationStopTime = proAppStopTime + simGracePeriod; // 模拟器真正的停止时间
 
     // Pro-Sink 应用参数 (硬编码)
     uint32_t proTaskSize = 256 * 1024; // (Bytes)
@@ -686,28 +895,34 @@ for (uint32_t nodeId : nodeIds)
             // 这是消费者 (Sink)
             Ptr<MySink> sinkApp = CreateObject<MySink>();
             sinkApp->Setup(ns.appRate, simulationStep);
+
+            // 设置统计周期
+            sinkApp->SetStatsInterval(g_statsInterval);
+
             node->AddApplication(sinkApp);
             sinkApp->SetStartTime(Seconds(proAppStartTime));
-            sinkApp->SetStopTime(Seconds(proAppStopTime));
+            sinkApp->SetStopTime(Seconds(simulationStopTime - 0.001)); // 确保在模拟器停止前停止
             proApps.Add(sinkApp);
             sinks.push_back(sinkApp);
         }
         else if (ns.type == NodeType::PRODUCER)
         {
             // 这是生产者 (Producer)
-            if (sinkAddresses.empty())
+            if (nodeLinkRateMap.count(nodeId) == 0)
             {
-                NS_LOG_WARN("Node " << nodeId
-                                    << " (edge) is a producer, but no sinks are available. "
-                                       "Skipping app installation.");
+                NS_LOG_WARN("Producer Node " << nodeId << " (edge-" << nodeId 
+                            << ") has no link defined in links.csv. Skipping app.");
                 continue;
             }
+            std::string linkRateStr = nodeLinkRateMap.at(nodeId);
+            DataRate linkRate = DataRate(linkRateStr);
             Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
             producerApp->Setup(sinkAddresses,
                                ns.appRate,
                                proTaskSize,
                                proPacketSize,
-                               simulationStep); 
+                               simulationStep,
+                               linkRate); 
             node->AddApplication(producerApp);
             producerApp->SetStartTime(Seconds(proAppStartTime));
             producerApp->SetStopTime(Seconds(proAppStopTime));
@@ -716,6 +931,7 @@ for (uint32_t nodeId : nodeIds)
         }
         // (ns.type == UNKNOWN 的节点会被自动跳过)
     }
+    Simulator::Stop(Seconds(simulationStopTime));
     NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
                              << " producers.");
     NS_LOG_INFO("Pro-Sink Apps will run from " << proAppStartTime << "s to " << proAppStopTime
@@ -771,6 +987,9 @@ for (uint32_t nodeId : nodeIds)
     // --- 设置总仿真停止时间 ---
     Simulator::Stop(Seconds(proAppStopTime)); // 停止时间取决于 Pro-Sink App
     NS_LOG_INFO("Simulation will stop at " << proAppStopTime << "s.");
+
+    // 安排第一次拥堵检查
+    Simulator::Schedule(g_statsInterval, &ReportLinkStats); // 【修改】调用新函数
 
     Simulator::Run();
 
