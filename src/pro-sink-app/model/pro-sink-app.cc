@@ -91,6 +91,10 @@ TypeId MySink::GetTypeId(void)
                         "Trace triggered when a task is completed.",
                         MakeTraceSourceAccessor(&MySink::m_taskCompletedTrace),
                         "ns3::TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t>")
+        .AddTraceSource("Utilization",
+                         "Trace triggered periodically with the compute utilization (0.0 to 1.0).",
+                         MakeTraceSourceAccessor(&MySink::m_utilizationTrace),
+                         "ns3::TracedCallback<double>")
         .AddAttribute("Port",
                       "Port on which to listen for connections.",
                       UintegerValue(8080),
@@ -118,7 +122,10 @@ MySink::MySink()
       m_tasksCompleted(0),
       m_tasksPerSecond(1000.0),
       m_processingCredit(0.0),
-      m_running(false)
+      m_running(false),
+       m_updateInterval(Seconds(0.25)), // 默认更新间隔为 0.25 秒
+       m_totalTimeInInterval(Time(0)),
+       m_idleTimeInInterval(Time(0))
 {
 }
 
@@ -130,10 +137,11 @@ MySink::~MySink()
 }
 
 void
-MySink::Setup(double tasksPerSecond, Time simulationStep)
+MySink::Setup(double tasksPerSecond, Time simulationStep, Time updateInterval)
 {
     m_tasksPerSecond = tasksPerSecond;
     m_simulationStep = simulationStep;
+    m_updateInterval = updateInterval; // 设置更新间隔
 }
 
 void
@@ -161,6 +169,7 @@ MySink::StartApplication()
     
     m_running = true;
     Simulator::Schedule(m_simulationStep, &MySink::ProcessTasks, this);
+    Simulator::Schedule(m_updateInterval, &MySink::ReportUtilization, this);
 }
 
 void
@@ -307,6 +316,17 @@ void
 MySink::ProcessTasks()
 {
     if (!m_running) return;
+     // --- 1. 算力利用率跟踪 (高精度轮询) ---
+     // 累加总时间 (以 simulationStep 为单位)
+     m_totalTimeInInterval += m_simulationStep;
+ 
+     // 仅当队列为空时 (即本个 step 处理器没事做)，累加空闲时间
+     if (m_taskQueue.empty())
+     {
+         m_idleTimeInInterval += m_simulationStep;
+     }
+ 
+     // --- 2. 现有任务处理逻辑 ---
     m_processingCredit += m_tasksPerSecond * m_simulationStep.GetSeconds();
     uint32_t tasksToProcess = floor(m_processingCredit);
     for (uint32_t i = 0; i < tasksToProcess && !m_taskQueue.empty(); ++i)
@@ -328,6 +348,42 @@ MySink::ProcessTasks()
         Simulator::Schedule(m_simulationStep, &MySink::ProcessTasks, this);
     }
 }
+
+// --- 算力利用率报告函数 ---
+void
+MySink::ReportUtilization()
+{
+    if (!m_running)
+    {
+        return;
+    }
+
+    // 1. 计算繁忙时间
+    Time busyTime = m_totalTimeInInterval - m_idleTimeInInterval;
+    
+    // 2. 计算利用率
+    double utilization = 0.0;
+    if (m_totalTimeInInterval > Time(0))
+    {
+        // 利用率 = 繁忙时间 / 总时间
+        utilization = busyTime.GetSeconds() / m_totalTimeInInterval.GetSeconds();
+    }
+
+    // 3. 打印日志
+    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 算力利用率 (过去 " 
+                  << m_updateInterval.GetSeconds() << "s): " << utilization * 100.0 << "%");
+
+    // 4. 触发 Trace (用于外部脚本绘图)
+    m_utilizationTrace(utilization);
+
+    // 5. 重置累加器，准备下一个间隔
+    m_totalTimeInInterval = Time(0);
+    m_idleTimeInInterval = Time(0);
+
+    // 6. 调度下一次报告
+    Simulator::Schedule(m_updateInterval, &MySink::ReportUtilization, this);
+}
+
 
 // --- 2. MyProducer 实现 (TCP 版本) ---
 

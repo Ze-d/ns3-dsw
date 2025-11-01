@@ -50,9 +50,10 @@ public:
     MySink();
     virtual ~MySink();
 
-    void Setup(double tasksPerSecond, Time simulationStep);
+    void Setup(double tasksPerSecond, Time simulationStep, Time updateInterval);
 
     TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
+    TracedCallback<double> m_utilizationTrace;
 
 private:
     virtual void StartApplication(void);
@@ -73,6 +74,8 @@ private:
 
     // --- 任务处理 ---
     void ProcessTasks();
+    // --- 算力统计 ---
+    void ReportUtilization();
 
     Ptr<Socket> m_listenSocket; // TCP 监听套接字
     std::list<Ptr<Socket>> m_acceptedSockets; // 跟踪所有活跃连接
@@ -92,6 +95,11 @@ private:
     double      m_tasksPerSecond;
     double      m_processingCredit;
     bool        m_running;
+
+    // --- 算力统计成员 ---
+    Time        m_updateInterval;       // 报告利用率的间隔
+    Time        m_totalTimeInInterval;  // 间隔内的总时间累加器
+    Time        m_idleTimeInInterval;   // 间隔内的空闲时间累加器
 };
 
 

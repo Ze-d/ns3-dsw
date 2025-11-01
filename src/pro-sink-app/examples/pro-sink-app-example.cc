@@ -3,7 +3,7 @@ pro-sink-app/example/pro-sink-example.cc
 一个简单的p2p拓扑，装载了消费者和生产者应用 (已更新为 TCP Pacing)
 
 to run:
-./ns3 run pro-sink-app-example
+./ns3 run pro-sink-app-example -- --consumerRatePerSecond=20 --lambda=25
 */
 
 
@@ -55,26 +55,43 @@ TaskCompletedCallback(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uin
                                                << totalCompleted);
 }
 
+/**
+ * @brief (新增) 消费者 "Utilization" Trace 的回调函数
+ * @param utilization 算力利用率 (0.0 to 1.0)
+ */
+void
+UtilizationCallback(double utilization)
+{
+    // MySink 内部已经用 NS_LOG_UNCOND 打印了利用率。
+    // 这个 Trace 主要用于脚本进行二次处理，例如写入 Gnuplot 文件。
+    // 我们在这里用 LOG_INFO 打印，以演示 Trace 已连接成功。
+    //NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [TRACE] Sink Node Utilization: " << utilization * 100.0 << "%");
+}
+
 
 int
 main(int argc, char* argv[])
 {
     // --- 参数定义 ---
     double lambda = 25.0; // 平均每秒生成任务数
-    double simulationTime = 1.0;
+    double simulationTime = 1.0; // 默认模拟 1 秒
     double simulationStepMs = 1.0; // tick长度
     double consumerRatePerSecond = 20.0; // 每秒消纳任务数
+    double updateIntervalSec = 0.25; // (新增) 算力利用率报告间隔，默认 1 秒
 
     CommandLine cmd(__FILE__);
     cmd.AddValue("lambda", "生产者平均每秒生成的任务数", lambda);
     cmd.AddValue("simulationTime", "模拟总时长 (秒)", simulationTime);
     cmd.AddValue("step", "模拟步长 (毫秒)", simulationStepMs);
     cmd.AddValue("consumerRatePerSecond", "消费者每秒处理的任务数", consumerRatePerSecond);
+    cmd.AddValue("updateInterval", "算力利用率报告间隔 (秒)", updateIntervalSec); // (新增)
     cmd.Parse(argc, argv);
 
     Time::SetResolution(Time::NS);
     LogComponentEnable("P2PTaskSimulationExample", LOG_LEVEL_INFO);
-    LogComponentEnable("ProSinkApp", LOG_LEVEL_INFO); 
+    
+    // (ProSinkApp 的日志由 MySink 内部的 NS_LOG_UNCOND 控制，无需在此启用)
+    // LogComponentEnable("ProSinkApp", LOG_LEVEL_INFO); 
 
     // --- TCP Pacing 关键配置 ---
     
@@ -121,13 +138,17 @@ main(int argc, char* argv[])
 
     // --- 应用层设置 ---
     Time simStep = MilliSeconds(simulationStepMs);
+    Time updateInterval = Seconds(updateIntervalSec); // (新增)
     uint16_t port = 8080;
     uint32_t taskSize = 256 * 1024;
     uint32_t packetSize = 1024; // 必须与 MyProducer/MySink 中的 m_packetSize 匹配
 
     // 1. 配置并安装消费者应用 (MySink)
     Ptr<MySink> sinkApp = CreateObject<MySink>();
-    sinkApp->Setup(consumerRatePerSecond, simStep);
+    
+    // (修改) Setup 函数现在需要 3 个参数
+    sinkApp->Setup(consumerRatePerSecond, simStep, updateInterval); 
+    
     // 通过 Attribute 设置 TaskSize 和 PacketSize
     sinkApp->SetAttribute("TaskSize", UintegerValue(taskSize));
     sinkApp->SetAttribute("PacketSize", UintegerValue(packetSize));
@@ -151,6 +172,7 @@ main(int argc, char* argv[])
 
     // --- 3. 连接 Trace Source ---
     sinkApp->TraceConnectWithoutContext("TaskCompleted", MakeCallback(&TaskCompletedCallback));
+    sinkApp->TraceConnectWithoutContext("Utilization", MakeCallback(&UtilizationCallback)); // (新增)
     producerApp->TraceConnectWithoutContext("TaskSent", MakeCallback(&TaskSentCallback));
 
     // --- 运行仿真 ---

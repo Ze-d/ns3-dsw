@@ -379,6 +379,7 @@ main(int argc, char* argv[])
     // --- Pro-Sink App 参数 ---
     double simulationStepMs = 1.0;                             // 默认步长 1ms
     double proAppDuration = 0.5;                               // 默认运行 0.5s
+    double proAppUpdateIntervalSec = 0.25;                      // 默认算力更新间隔 0.25s
     std::string proSinkXmlFile = "scratch/pro_sink_stats.xml"; // 默认 XML 输出文件名
 
     CommandLine cmd;
@@ -403,6 +404,7 @@ main(int argc, char* argv[])
     // --- Pro-Sink App 命令行参数 ---
     cmd.AddValue("simulationStep", "Simulation step for Pro-Sink App (ms)", simulationStepMs);
     cmd.AddValue("proAppDuration", "Duration for Pro-Sink App (s)", proAppDuration);
+    cmd.AddValue("proAppUpdateInterval", "Pro-Sink App utilization report interval (s)", proAppUpdateIntervalSec);
     cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
 
     cmd.Parse(argc, argv);
@@ -427,6 +429,7 @@ main(int argc, char* argv[])
     // 解析消费者列表
     // --- 解析 Pro-Sink 时间参数 ---
     Time simulationStep = MilliSeconds(simulationStepMs);
+    Time proAppUpdateInterval = Seconds(proAppUpdateIntervalSec);
     NS_LOG_INFO("Pro-Sink simulation step: " << simulationStep);
     NS_LOG_INFO("Pro-Sink duration: " << proAppDuration << "s");
 
@@ -711,8 +714,8 @@ main(int argc, char* argv[])
         {
             // 这是消费者 (Sink)
             Ptr<MySink> sinkApp = CreateObject<MySink>();
-            sinkApp->Setup(ns.appRate, simulationStep);
-            // [新增] TCP 版本 MySink 需要通过 Attribute 设置大小
+            sinkApp->Setup(ns.appRate, simulationStep, proAppUpdateInterval);
+            // TCP 版本 MySink 需要通过 Attribute 设置大小
             sinkApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             sinkApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));
             node->AddApplication(sinkApp);
@@ -733,19 +736,19 @@ main(int argc, char* argv[])
             }
             Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
 
-        // [修改] 使用轮询 (Round-Robin) 方式将生产者分配给消费者
+        // 使用轮询 (Round-Robin) 方式将生产者分配给消费者
             Address targetSink = sinkAddresses[sinkRoundRobinIndex]; 
             
             // 更新索引，使其在 sinkAddresses 列表的大小上循环
             sinkRoundRobinIndex = (sinkRoundRobinIndex + 1) % sinkAddresses.size();
 
-            producerApp->Setup(targetSink, // [修改] 传递单个 Address
+            producerApp->Setup(targetSink, // 传递单个 Address
                                ns.appRate,
                                proTaskSize,
                                proPacketSize,
                                simulationStep); 
             
-            // [新增] 同样设置 Attribute (与 example 保持一致)
+            // 同样设置 Attribute (与 example 保持一致)
             producerApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             producerApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));
 
@@ -811,7 +814,7 @@ main(int argc, char* argv[])
                 label << id << ":" << nm;
             anim.UpdateNodeDescription(n, label.str());
             
-            // [修改] 根据新类型为节点着色
+            // 根据新类型为节点着色
             if (nodeSpecMap.count(id))
             {
                 if(nodeSpecMap.at(id).type == NodeType::PRODUCER)
@@ -836,7 +839,7 @@ main(int argc, char* argv[])
     Ptr<FlowMonitor> monitor = fmh.InstallAll();
 
     // --- 设置总仿真停止时间 ---
-    Simulator::Stop(Seconds(proAppStopTime + 0.5)); // [修改] 增加 0.5s 缓冲以确保 TCP 连接关闭
+    Simulator::Stop(Seconds(proAppStopTime + 0.5)); // 增加 0.5s 缓冲以确保 TCP 连接关闭
     NS_LOG_INFO("Simulation will stop at " << (proAppStopTime + 0.5) << "s.");
 
     Simulator::Run();
