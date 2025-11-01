@@ -14,7 +14,7 @@ to run:
 #include "ns3/applications-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
 
-// [新] 包含流量控制模块
+// 包含流量控制模块
 #include "ns3/traffic-control-module.h"
 
 // 包含新建模块
@@ -24,7 +24,7 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("P2PTaskSimulationExample");
 
-// --- 1. 定义 Trace Callback 函数 (与之前相同) ---
+// --- 1. 定义 Trace Callback 函数 ---
 
 /**
  * @brief 生产者 "TaskSent" Trace 的回调函数
@@ -74,12 +74,11 @@ main(int argc, char* argv[])
 
     Time::SetResolution(Time::NS);
     LogComponentEnable("P2PTaskSimulationExample", LOG_LEVEL_INFO);
-    // [修改] 更新日志组件名称以匹配 .cc 文件
     LogComponentEnable("ProSinkApp", LOG_LEVEL_INFO); 
 
-    // --- [新] TCP Pacing 关键配置 ---
+    // --- TCP Pacing 关键配置 ---
     
-    // 设置默认的 TCP 拥塞控制算法 (例如 Cubic)
+    // 设置默认的 TCP 拥塞控制算法 (Cubic)
     Config::SetDefault("ns3::TcpL4Protocol::SocketType", 
                        TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
 
@@ -87,7 +86,7 @@ main(int argc, char* argv[])
     Config::SetDefault("ns3::TcpSocketState::EnablePacing", 
                        BooleanValue(true));
 
-    // 2. (可选, 但推荐) 启用初始窗口的 Pacing
+    // 2. (可选) 启用初始窗口的 Pacing
     Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", 
                        BooleanValue(true));
 
@@ -101,11 +100,6 @@ main(int argc, char* argv[])
     pointToPoint.SetDeviceAttribute("DataRate", StringValue("100Mbps"));
     pointToPoint.SetChannelAttribute("Delay", StringValue("2ms"));
 
-    // [修改] 移除 DropTailQueue，后续使用 TrafficControlHelper
-    // Ptr<DropTailQueue<Packet>> q = CreateObject<DropTailQueue<Packet>>();
-    // q->SetAttribute("MaxSize", QueueSizeValue(QueueSize("4000p")));
-    // pointToPoint.SetDeviceAttribute("TxQueue", PointerValue(q));
-
     // 连接 Node 0 和 Node 1
     NetDeviceContainer p2pDevices;
     p2pDevices.Add(pointToPoint.Install(producerNodes.Get(0), consumerNodes.Get(0)));
@@ -114,7 +108,7 @@ main(int argc, char* argv[])
     stack.Install(producerNodes);
     stack.Install(consumerNodes);
 
-    // --- [新] 安装 FqCoDel 队列以支持 Pacing ---
+    // --- 安装 FqCoDel 队列以支持 Pacing ---
     TrafficControlHelper tch;
     tch.SetRootQueueDisc("ns3::FqCoDelQueueDisc");
     tch.Install(p2pDevices);
@@ -122,8 +116,6 @@ main(int argc, char* argv[])
 
     Ipv4AddressHelper address;
     address.SetBase("10.1.1.0", "255.255.255.0");
-    // p2pDevices.Get(0) 是生产者 (10.1.1.1)
-    // p2pDevices.Get(1) 是消费者 (10.1.1.2)
     Ipv4InterfaceContainer interfaces = address.Assign(p2pDevices);
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
@@ -136,7 +128,7 @@ main(int argc, char* argv[])
     // 1. 配置并安装消费者应用 (MySink)
     Ptr<MySink> sinkApp = CreateObject<MySink>();
     sinkApp->Setup(consumerRatePerSecond, simStep);
-    // [修改] 通过 Attribute 设置 TaskSize 和 PacketSize
+    // 通过 Attribute 设置 TaskSize 和 PacketSize
     sinkApp->SetAttribute("TaskSize", UintegerValue(taskSize));
     sinkApp->SetAttribute("PacketSize", UintegerValue(packetSize));
     consumerNodes.Get(0)->AddApplication(sinkApp); // 安装在 Node 1
@@ -146,18 +138,18 @@ main(int argc, char* argv[])
     // 2. 配置并安装生产者应用 (MyProducer)
     Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
     
-    // [修改] MyProducer::Setup 现在接受单个 Address
+    // MyProducer::Setup 现在接受单个 Address
     Address sinkAddress(InetSocketAddress(interfaces.GetAddress(1), port));
     
     producerApp->Setup(sinkAddress, lambda, taskSize, packetSize, simStep);
-    // [修改] 通过 Attribute 设置 TaskSize 和 PacketSize
+    // 通过 Attribute 设置 TaskSize 和 PacketSize
     producerApp->SetAttribute("TaskSize", UintegerValue(taskSize));
     producerApp->SetAttribute("PacketSize", UintegerValue(packetSize));
     producerNodes.Get(0)->AddApplication(producerApp); // 安装在 Node 0
     producerApp->SetStartTime(Seconds(0.1));
     producerApp->SetStopTime(Seconds(simulationTime));
 
-    // --- 3. 连接 Trace Source (与之前相同) ---
+    // --- 3. 连接 Trace Source ---
     sinkApp->TraceConnectWithoutContext("TaskCompleted", MakeCallback(&TaskCompletedCallback));
     producerApp->TraceConnectWithoutContext("TaskSent", MakeCallback(&TaskSentCallback));
 

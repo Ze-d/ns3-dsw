@@ -12,7 +12,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE("ProSinkApp"); 
 
-// --- 0. TaskHeader 实现 (与之前相同) ---
+// --- 0. TaskHeader 实现  ---
 
 TypeId TaskHeader::GetTypeId(void)
 {
@@ -202,9 +202,8 @@ MySink::HandleNewConnection(Ptr<Socket> socket, const Address& from)
     NS_LOG_INFO("Node " << GetNode()->GetId() << " handling new connection from " << InetSocketAddress::ConvertFrom(from).GetIpv4());
     
     m_acceptedSockets.push_back(socket);
-    m_socketBuffers[socket] = Buffer(); // 严格遵守教训 3 和 5：为新连接创建缓冲区
+    m_socketBuffers[socket] = Buffer(); // 为新连接创建缓冲区
 
-    // 严格遵守教训 1 和 2：使用正确签名的回调
     socket->SetRecvCallback(MakeCallback(&MySink::HandleRead, this));
     socket->SetCloseCallbacks(MakeCallback(&MySink::HandleNormalClose, this),
                               MakeCallback(&MySink::HandleErrorClose, this));
@@ -235,7 +234,6 @@ MySink::CleanupConnection(Ptr<Socket> socket)
 void
 MySink::HandleRead(Ptr<Socket> socket)
 {
-    // 严格遵守教训 3：从套接字读取所有可用数据到应用缓冲区
     while (socket->GetRxAvailable() > 0)
     {
         Ptr<Packet> packet = socket->Recv(socket->GetRxAvailable(), 0);
@@ -245,13 +243,9 @@ MySink::HandleRead(Ptr<Socket> socket)
             break; // 实际上 GetRxAvailable > 0 保证了 packet size > 0
         }
 
-        // --- BEGIN FIX ---
-        // 严格遵守教训 5：
-        // 1. Packet::CopyData 到一个临时 C-style 缓冲区
         uint8_t* tempBuffer = new uint8_t[packetSize];
         packet->CopyData(tempBuffer, packetSize);
 
-        // 2. Buffer::AddAtEnd(size) + Iterator::Write
         Buffer& appBuffer = m_socketBuffers[socket];
         appBuffer.AddAtEnd(packetSize); // 预留空间
         Buffer::Iterator it = appBuffer.End();
@@ -259,17 +253,15 @@ MySink::HandleRead(Ptr<Socket> socket)
         it.Write(tempBuffer, packetSize); // 写入数据
 
         delete[] tempBuffer;
-        // --- END FIX ---
     }
     
-    // 处理我们缓冲区中的字节流
+    // 处理缓冲区中的字节流
     ProcessSocketBuffer(socket);
 }
 
 void
 MySink::ProcessSocketBuffer(Ptr<Socket> socket)
 {
-    // 严格遵守教训 5：正确处理 Buffer API
     Buffer& buffer = m_socketBuffers[socket];
 
     uint32_t headerSize = TaskHeader().GetSerializedSize();
@@ -297,7 +289,7 @@ MySink::ProcessSocketBuffer(Ptr<Socket> socket)
         // 4. 从缓冲区移除 Payload (严格遵守教训 5)
         buffer.RemoveAtStart(payloadSize);
 
-        // 5. 检查任务是否完整接收 (与 UDP 逻辑相同)
+        // 5. 检查任务是否完整接收
         if (m_currentRxBytesPerTask[taskKey] >= m_taskSize)
         {
             m_taskQueue.push(taskKey);
@@ -375,7 +367,7 @@ MyProducer::MyProducer()
       m_lambda(0.0),
       m_interTaskTimeGenerator(nullptr),
       m_running(false),
-      m_connected(false) // 严格遵守教训 4：使用布尔标志管理状态
+      m_connected(false)
 {
 }
 
@@ -420,13 +412,25 @@ MyProducer::StartApplication()
 void
 MyProducer::StopApplication()
 {
-    m_running = false;
-    if (m_socket != nullptr)
+    m_running = false; // 1. 信号：停止生成新任务和接受新任务
+
+    NS_LOG_UNCOND("生产者应用停止命令。节点 " << GetNode()->GetId() << " 总共发送任务数: " << m_totalTasksSent 
+                  << ". 队列中剩余任务数: " << m_taskQueue.size() 
+                  << ". 是否正在发送: " << (m_isSending ? "是" : "否"));
+
+    // 2. 检查是否可以立即停止
+    if (!m_isSending)
     {
-        m_socket->Close();
-        m_connected = false; // 严格遵守教训 4
+        // 当前没有任务在发送，可以安全关闭
+        NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 立即停止 (未在发送)。");
+        if (m_socket != nullptr && m_connected) // 检查 m_connected 避免在未连接时关闭
+        {
+            m_socket->Close();
+            m_connected = false; 
+        }
     }
-    NS_LOG_UNCOND("生产者应用停止。节点 " << GetNode()->GetId() << " 总共发送任务数: " << m_totalTasksSent << ". 队列中剩余任务数: " << m_taskQueue.size());
+    // 3. 如果 m_isSending == true，则什么也不做。
+    //    SendPacket() 将在完成发送后处理关闭。
 }
 
 // --- TCP 回调实现 ---
@@ -537,7 +541,8 @@ MyProducer::SendNextTask()
 void
 MyProducer::SendPacket()
 {
-    if (!m_running || !m_connected || !m_isSending)
+    // 软停止
+    if (!m_connected || !m_isSending)
     {
         m_isSending = false; // 确保状态一致
         return;
@@ -547,8 +552,6 @@ MyProducer::SendPacket()
     while (m_totalBytesSentForCurrentTask < m_taskSize)
     {
         // 检查 TCP 发送缓冲区是否有空间
-        // 我们需要 (header + payload) 的空间，但 Send() 会为我们处理
-        // Pacing 会在这里起作用：GetTxAvailable() 会反映 Pacing 速率允许的量
         if (m_socket->GetTxAvailable() < m_packetSize + TaskHeader().GetSerializedSize())
         {
             // 缓冲区已满（或 Pacing 限制），等待 HandleSend 回调
@@ -558,7 +561,7 @@ MyProducer::SendPacket()
         TaskHeader header;
         header.SetData(m_currentSendingProducerId, m_currentSendingTaskId);
 
-        // 严格遵守教训 3：使用 Ptr<Packet>
+        // (与之前相同)
         Ptr<Packet> packet = Create<Packet>(m_packetSize); // 只创建 payload
         packet->AddHeader(header); // 添加 header
         
@@ -566,14 +569,11 @@ MyProducer::SendPacket()
 
         if (bytesSent < 0)
         {
-            // 发送失败，可能是连接断开
+            // (与之前相同)
             NS_LOG_WARN("TCP Send failed with error.");
-            // ErrorClose/NormalClose 回调将处理状态清理
             return;
         }
         
-        // 假设 Send() 接受了整个包（对于 TCP 流是正确的）
-        // 我们按 payload 大小跟踪任务进度
         m_totalBytesSentForCurrentTask += m_packetSize;
     }
 
@@ -581,8 +581,26 @@ MyProducer::SendPacket()
     NS_LOG_INFO("Node " << GetNode()->GetId() << " finished sending task " << m_currentSendingProducerId << "-" << m_currentSendingTaskId);
     m_isSending = false;
     
-    // 尝试立即发送下一个任务
-    Simulator::ScheduleNow(&MyProducer::SendNextTask, this);
+    // 检查是否已请求停止 (m_running == false)
+    if (!m_running)
+    {
+        // 软停止：任务已发送完毕，并且 StopApplication 已被调用。
+        // 现在可以安全关闭套接字。
+        NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 " 
+                      << m_currentSendingProducerId << "-" << m_currentSendingTaskId
+                      << "，现在关闭套接字。");
+        if (m_socket != nullptr && m_connected)
+        {
+            m_socket->Close();
+            m_connected = false;
+        }
+        // 不再安排 SendNextTask
+    }
+    else
+    {
+        // 正常操作：尝试发送队列中的下一个任务
+        Simulator::ScheduleNow(&MyProducer::SendNextTask, this);
+    }
 }
 
 } // namespace ns3

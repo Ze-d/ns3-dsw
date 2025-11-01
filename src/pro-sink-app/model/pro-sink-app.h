@@ -18,7 +18,7 @@
 
 namespace ns3 {
 
-// --- 0. 自定义包头 (TaskHeader) 声明 (与之前相同) ---
+// --- 0. 自定义包头 (TaskHeader) 声明 ---
 class TaskHeader : public Header
 {
 public:
@@ -63,21 +63,20 @@ private:
     void HandleNewConnection(Ptr<Socket> socket, const Address& from);
     void CleanupConnection(Ptr<Socket> socket);
     
-    // --- TCP 回调 (严格遵守教训 1, 2) ---
+    // --- TCP 回调 ---
     void HandleRead(Ptr<Socket> socket);
     void HandleNormalClose(Ptr<Socket> socket);
     void HandleErrorClose(Ptr<Socket> socket);
     
-    // --- TCP 流处理 (严格遵守教训 3, 5) ---
+    // --- TCP 流处理 ---
     void ProcessSocketBuffer(Ptr<Socket> socket);
 
-    // --- 任务处理 (同之前) ---
+    // --- 任务处理 ---
     void ProcessTasks();
 
     Ptr<Socket> m_listenSocket; // TCP 监听套接字
     std::list<Ptr<Socket>> m_acceptedSockets; // 跟踪所有活跃连接
     
-    // 严格遵守教训 3, 5：为每个连接维护一个应用层缓冲区
     std::map<Ptr<Socket>, Buffer> m_socketBuffers;
 
     uint16_t    m_port;
@@ -96,7 +95,7 @@ private:
 };
 
 
-// --- 2. 自定义生产者应用 (MyProducer) 声明 (TCP 版本) ---
+// --- 2. 自定义生产者应用 (MyProducer) ---
 class MyProducer : public Application
 {
 public:
@@ -104,7 +103,6 @@ public:
     MyProducer();
     virtual ~MyProducer();
 
-    // Setup 已修改：现在只接受一个目标地址
     void Setup(Address sinkAddress, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
 
     TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
@@ -113,14 +111,14 @@ private:
     virtual void StartApplication(void);
     virtual void StopApplication(void);
 
-    // --- TCP 回调 (严格遵守教训 1, 2) ---
+    // --- TCP 回调 ---
     void ConnectionSucceeded(Ptr<Socket> socket);
     void ConnectionFailed(Ptr<Socket> socket);
     void HandleSend(Ptr<Socket> socket, uint32_t txSpace); // 流量控制
     void NormalClose(Ptr<Socket> socket);
     void ErrorClose(Ptr<Socket> socket);
 
-    // --- 发送和生成逻辑 (已修改) ---
+    // --- 发送和生成逻辑 ---
     void SendPacket();
     void SendNextTask();
     void GenerateTasks();
@@ -143,7 +141,7 @@ private:
     std::queue<bool> m_taskQueue;
     
     bool m_running;
-    bool m_connected; // 严格遵守教训 4：连接状态标志
+    bool m_connected;
 };
 
 } // namespace ns3
