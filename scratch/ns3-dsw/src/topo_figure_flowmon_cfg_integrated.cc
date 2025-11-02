@@ -62,7 +62,6 @@ struct LinkSpec
     uint32_t id = 0;       // 标识符（可从 CSV 读取，若缺省则自动分配）
 };
 
-// ... [LoadCsvNodes 和 LoadCsvLinks 函数保持不变, 此处省略] ...
 // nodes.csv: id,x,y,name,rate
 static std::vector<NodeSpec>
 LoadCsvNodes(const std::string& path)
@@ -866,8 +865,7 @@ main(int argc, char* argv[])
         g_xmlFile << "<ProSinkStats simulationStep=\"" << simulationStep << "\" duration=\""
                   << proAppDuration << "\">" << std::endl;
     }
-
-    // --- MODIFICATION: Open new util XML file ---
+    // --- Open core util XML file ---
     g_utilXmlFile.open(nodeUtilXmlFile);
     if (!g_utilXmlFile.is_open())
     {
@@ -879,7 +877,6 @@ main(int argc, char* argv[])
         g_utilXmlFile << "<NodeUtilizationStats simulationStep=\"" << simulationStep << "\" duration=\""
                         << proAppDuration << "\">" << std::endl;
     }
-    // --- End Modification ---
 
     // 连接 Sink Traces
     for (auto& sink : sinks)
@@ -892,8 +889,6 @@ main(int argc, char* argv[])
     {
         producer->TraceConnectWithoutContext("TaskSent", MakeCallback(&OnProducerTaskSent));
     }
-    // --- End Modification ---
-
 
     // NetAnim：高亮 server/client
     if (enableAnim)
@@ -950,7 +945,6 @@ main(int argc, char* argv[])
 
     Simulator::Run();
 
-    // ... [FlowMonitor 统计部分保持不变, 此处省略] ...
     monitor->CheckForLostPackets();
     Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(fmh.GetClassifier());
     auto stats = monitor->GetFlowStats();
@@ -1033,16 +1027,13 @@ main(int argc, char* argv[])
         g_xmlFile.close();
         std::cout << "[stats] Pro-Sink XML written: " << proSinkXmlFile << std::endl;
     }
-
-    // --- MODIFICATION: Close new util XML file ---
+    // --- core util XML file ---
     if (g_utilXmlFile.is_open())
     {
         g_utilXmlFile << "</NodeUtilizationStats>" << std::endl;
         g_utilXmlFile.close();
         std::cout << "[stats] Node Utilization XML written: " << nodeUtilXmlFile << std::endl;
     }
-    // --- End Modification ---
-
 
     Simulator::Destroy();
     std::cout << "\nDone.\n";
