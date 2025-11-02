@@ -3,8 +3,8 @@
 #include "ns3/simulator.h"
 #include "ns3/string.h" // 包含 StringValue
 #include "ns3/double.h" // 包含 DoubleValue
-#include <list>         // [修改]
-#include <atomic>       // [修改]
+#include <list>          
+#include <atomic>       
 
 namespace ns3 {
 
@@ -26,7 +26,7 @@ LinkUtilizationMonitor::LinkUtilizationMonitor()
       m_running(false),
       m_xmlHeaderWritten(false),
       m_xmlFilePath("scratch/ns3-dsw/out/link_util.xml"), // 默认路径
-      m_lastPollTime(Seconds(0)) // [修改] 初始化上次轮询时间
+      m_lastPollTime(Seconds(0)) // 初始化上次轮询时间
 {
 }
 
@@ -69,12 +69,12 @@ LinkUtilizationMonitor::GetTcLayer(Ptr<NetDevice> dev)
     {
         return nullptr;
     }
-    Ptr<Node> node = dev->GetNode(); //
+    Ptr<Node> node = dev->GetNode();
     if (!node)
     {
         return nullptr;
     }
-    return node->GetObject<TrafficControlLayer>(); //
+    return node->GetObject<TrafficControlLayer>();
 }
 
 void
@@ -94,8 +94,8 @@ LinkUtilizationMonitor::RegisterLink(uint32_t linkId,
         return;
     }
 
-    Ptr<QueueDisc> qdA = tcA->GetRootQueueDiscOnDevice(devA); //
-    Ptr<QueueDisc> qdB = tcB->GetRootQueueDiscOnDevice(devB); //
+    Ptr<QueueDisc> qdA = tcA->GetRootQueueDiscOnDevice(devA);
+    Ptr<QueueDisc> qdB = tcB->GetRootQueueDiscOnDevice(devB);
 
     if (!qdA || !qdB)
     {
@@ -104,14 +104,14 @@ LinkUtilizationMonitor::RegisterLink(uint32_t linkId,
         return;
     }
 
-    // [修改] 使用 emplace_back() 在 list 末尾就地构造一个默认的 LinkRecord
+    // 使用 emplace_back() 在 list 末尾就地构造一个默认的 LinkRecord
     // 这会调用 LinkRecord 的默认构造函数，并将 atomic 成员零初始化
     m_links.emplace_back(); 
     
-    // [修改] 获取刚创建的、位于 list 中的对象的稳定指针
+    // 获取刚创建的、位于 list 中的对象的稳定指针
     LinkRecord* recPtr = &m_links.back();
 
-    // [修改] 通过指针填充就地构造的对象
+    // 通过指针填充就地构造的对象
     recPtr->linkId = linkId;
     recPtr->nodeAId = nodeAId;
     recPtr->nodeBId = nodeBId;
@@ -119,7 +119,7 @@ LinkUtilizationMonitor::RegisterLink(uint32_t linkId,
     recPtr->qd_A_to_B = qdA;
     recPtr->qd_B_to_A = qdB;
     
-    // [修改] 显式初始化 atomic (虽然默认构造已将其置零，但这样更清晰)
+    // 显式初始化 atomic (虽然默认构造已将其置零，但这样更清晰)
     recPtr->intervalBytes_A_to_B = 0;
     recPtr->intervalBytes_B_to_A = 0;
     
@@ -129,7 +129,7 @@ LinkUtilizationMonitor::RegisterLink(uint32_t linkId,
     recPtr->rateStr = ss.str();
 
 
-    // [修改] 连接 QueueDisc 的 Dequeue 跟踪到我们的静态回调函数
+    // 连接 QueueDisc 的 Dequeue 跟踪到我们的静态回调函数
     // 使用 MakeBoundCallback 绑定额外的参数 (recPtr 和 方向)
     qdA->TraceConnectWithoutContext(
         "Dequeue",
@@ -148,14 +148,12 @@ void
 LinkUtilizationMonitor::Start()
 {
     //在启动时，按 linkId 对 m_links 列表进行排序
-    // [修改] 使用 std::list::sort
     m_links.sort(
         [](const LinkRecord& a, const LinkRecord& b) { return a.linkId < b.linkId; });
     
     m_running = true;
     WriteXmlHeader();
     
-    // [修改] 设置启动轮询的基准时间
     m_lastPollTime = Simulator::Now(); 
     Simulator::ScheduleNow(&LinkUtilizationMonitor::PollStats, this);
 }
@@ -201,15 +199,15 @@ LinkUtilizationMonitor::PollStats()
         return;
     }
 
-    // [关键修复] 计算自上次轮询以来的 *实际* 时间差
+    // 计算自上次轮询以来的实际时间差
     Time now = Simulator::Now();
     double dt = (now - m_lastPollTime).GetSeconds();
-    m_lastPollTime = now; // [关键修复] 更新上次轮询时间
+    m_lastPollTime = now; // 更新上次轮询时间
 
     if (dt == 0.0)
     {
         NS_LOG_WARN("LinkUtilizationMonitor: Poll interval 'dt' is zero, skipping sample.");
-        // [修改] 重新调度并返回，避免除以零
+        // 重新调度并返回，避免除以零
         Simulator::Schedule(m_interval, &LinkUtilizationMonitor::PollStats, this);
         return; 
     }
@@ -222,7 +220,7 @@ LinkUtilizationMonitor::PollStats()
     if (m_xmlFile.is_open())
     {
         m_xmlFile << "  <Sample time=\"" << std::fixed << std::setprecision(6) << now.GetSeconds()
-                  << "\" dt=\"" << dt << "\">" << std::endl; // [修改] 记录真实 dt
+                  << "\" dt=\"" << dt << "\">" << std::endl; // 记录真实 dt
     }
 
     double totalUtilPct = 0.0;
@@ -231,7 +229,7 @@ LinkUtilizationMonitor::PollStats()
     // --- 4. 遍历所有注册的链路 ---
     for (auto& link : m_links)
     {
-        // 4.1 [修改] 从回调累加器中原子地读取并重置字节数
+        // 4.1 从回调累加器中原子地读取并重置字节数
         // exchange(0) 会返回当前值，并将计数器设置为0
         uint64_t bytesA = link.intervalBytes_A_to_B.exchange(0);
         uint64_t bytesB = link.intervalBytes_B_to_A.exchange(0);
@@ -271,13 +269,11 @@ LinkUtilizationMonitor::PollStats()
             m_xmlFile << "    <Link id=\"" << link.linkId << "\" rate=\"" << link.rateStr
                       << "\" nodeA=\"" << link.nodeAId << "\" nodeB=\"" << link.nodeBId << "\">\n"
                       << "      <AtoB rateBps=\"" << rateA_bps << "\" rateMbps=\"" << rateA_Mbps
-                      << "\" utilPct=\"" << utilA_pct << "\" bytes=\"" << bytesA << "\" />\n" // [修改] 增加 bytes
+                      << "\" utilPct=\"" << utilA_pct << "\" bytes=\"" << bytesA << "\" />\n" // 增加 bytes
                       << "      <BtoA rateBps=\"" << rateB_bps << "\" rateMbps=\"" << rateB_Mbps
-                      << "\" utilPct=\"" << utilB_pct << "\" bytes=\"" << bytesB << "\" />\n" // [修改] 增加 bytes
+                      << "\" utilPct=\"" << utilB_pct << "\" bytes=\"" << bytesB << "\" />\n" // 增加 bytes
                       << "    </Link>\n";
         }
-
-        // 4.6 [修改] 移除对 prevTxBytes 的更新
     }
 
     // --- 5. 打印全局平均利用率 ---
@@ -297,7 +293,7 @@ LinkUtilizationMonitor::PollStats()
 }
 
 
-// [新增] 静态回调函数的实现
+// 静态回调函数的实现
 void
 LinkUtilizationMonitor::StaticOnDequeue(LinkRecord* rec, bool isAtoB, Ptr<const QueueDiscItem> item)
 {
@@ -307,7 +303,7 @@ LinkUtilizationMonitor::StaticOnDequeue(LinkRecord* rec, bool isAtoB, Ptr<const 
         return;
     }
 
-    Ptr<const Packet> packet = item->GetPacket();  // ✅ 从 QueueDiscItem 中取出 Packet
+    Ptr<const Packet> packet = item->GetPacket();  // 从 QueueDiscItem 中取出 Packet
     if (!packet)
     {
         return;

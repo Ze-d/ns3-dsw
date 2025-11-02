@@ -14,10 +14,10 @@
 
 
 #include <string>
-#include <list>     // [修改] 使用 list 保证指针稳定性
+#include <list>     // 使用 list 保证指针稳定性
 #include <fstream>
 #include <iomanip>  // 用于 std::setw 等
-#include <atomic>   // [修改] 用于回调安全累加
+#include <atomic>   // 用于回调安全累加
 
 namespace ns3 {
 
@@ -100,7 +100,7 @@ class LinkUtilizationMonitor : public Object
         Ptr<QueueDisc> qd_A_to_B; //!< QueueDisc on Node A (sends to B)
         Ptr<QueueDisc> qd_B_to_A; //!< QueueDisc on Node B (sends to A)
 
-        // [修改] 使用 atomic 累加器，由回调函数写入，由 PollStats 读取
+        // 使用 atomic 累加器，由回调函数写入，由 PollStats 读取
         std::atomic<uint64_t> intervalBytes_A_to_B; //!< Bytes dequeued (A->B) since last poll
         std::atomic<uint64_t> intervalBytes_B_to_A; //!< Bytes dequeued (B->A) since last poll
     };
@@ -128,20 +128,20 @@ class LinkUtilizationMonitor : public Object
     Ptr<TrafficControlLayer> GetTcLayer(Ptr<NetDevice> dev);
 
     /**
-     * [新增] 静态回调函数，用于 QueueDisc 的 "Dequeue" 跟踪。
+     * 静态回调函数，用于 QueueDisc 的 "Dequeue" 跟踪。
      * @param rec 指向要更新的 LinkRecord 的指针。
      * @param isAtoB 标识方向 (true A->B, false B->A)。
      * @param packet 出队的数据包。
      */
     static void StaticOnDequeue(LinkRecord* rec, bool isAtoB, Ptr<const QueueDiscItem> item);
 
-    std::list<LinkRecord> m_links;   //!< [修改] 监控链路列表 (使用 list)
+    std::list<LinkRecord> m_links;   //!< 监控链路列表 (使用 list)
     Time m_interval;                 //!< Polling interval
     bool m_running;                  //!< Flag to control the polling loop
     bool m_xmlHeaderWritten;         //!< Flag to ensure footer is only written if header was
     std::ofstream m_xmlFile;         //!< Output file stream for XML
     std::string m_xmlFilePath;       //!< Path to the XML file
-    Time m_lastPollTime;             //!< [新增] 上次轮询的精确时间
+    Time m_lastPollTime;             //!< 上次轮询的精确时间
 };
 
 } // namespace ns3

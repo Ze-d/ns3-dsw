@@ -1,10 +1,10 @@
 #include "dswutils.h"
-#include "link-utilization-monitor.h" // [新增] 链路占用率监控
+#include "link-utilization-monitor.h" // 链路占用率监控
 
 #include "ns3/applications-module.h"
 #include "ns3/config.h" // 用于 Config::SetDefault
 #include "ns3/core-module.h"
-#include "ns3/data-rate.h" // [新增] 支持 DataRate
+#include "ns3/data-rate.h"
 #include "ns3/flow-monitor-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
@@ -16,7 +16,7 @@
 #include "ns3/point-to-point-module.h"
 #include "ns3/pro-sink-app.h"
 #include "ns3/string.h" // 用于 StringValue
-#include "ns3/traffic-control-module.h" // [已存在] 支持 Pacing
+#include "ns3/traffic-control-module.h" //Pacing
 
 #include <algorithm>
 #include <cctype>
@@ -61,7 +61,6 @@ struct LinkSpec
     uint32_t id = 0;       // 标识符（可从 CSV 读取，若缺省则自动分配）
 };
 
-// ... [LoadCsvNodes 和 LoadCsvLinks 函数保持不变] ...
 // nodes.csv: id,x,y,name,rate
 static std::vector<NodeSpec>
 LoadCsvNodes(const std::string& path)
@@ -254,7 +253,7 @@ SetupLogging(const std::string& levelStr)
         lv = LOG_LEVEL_ALL;
     LogComponentEnable("TopoFigureFlowmonCfg", lv);
     LogComponentEnable("ProSinkApp", lv); // 启用新 App 的日志
-    LogComponentEnable("LinkUtilizationMonitor", lv); // [新增] 启用链路监控日志
+    LogComponentEnable("LinkUtilizationMonitor", lv); // 启用链路监控日志
     NS_LOG_INFO("Logging level set to: " << s);
 }
 
@@ -386,7 +385,7 @@ main(int argc, char* argv[])
     double proAppUpdateIntervalSec = 0.25;                      // 默认算力更新间隔 0.25s
     std::string proSinkXmlFile = "scratch/pro_sink_stats.xml"; // 默认 XML 输出文件名
 
-    // --- [新增] 链路监控参数 ---
+    // --- 链路监控参数 ---
     double linkUtilIntervalSec = 0.25; // 默认 0.25s 轮询
     std::string linkUtilXmlFile = "scratch/ns3-dsw/out/link_util.xml"; // 默认 XML
     bool enableLinkUtil = true; // 默认启用
@@ -416,7 +415,7 @@ main(int argc, char* argv[])
     cmd.AddValue("proAppUpdateInterval", "Pro-Sink App utilization report interval (s)", proAppUpdateIntervalSec);
     cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
 
-    // --- [新增] 链路监控命令行参数 ---
+    // --- 链路监控命令行参数 ---
     cmd.AddValue("enableLinkUtil", "Enable Link Utilization Monitor (0/1)", enableLinkUtil);
     cmd.AddValue("linkUtilInterval", "Link Utilization Monitor poll interval (s)", linkUtilIntervalSec);
     cmd.AddValue("linkUtilXml", "Link Utilization Monitor XML output file", linkUtilXmlFile);
@@ -424,7 +423,7 @@ main(int argc, char* argv[])
     cmd.Parse(argc, argv);
     SetupLogging(logLevel);
 
-    // --- [新增] 创建和配置链路监控器 ---
+    // --- 创建和配置链路监控器 ---
     Ptr<LinkUtilizationMonitor> linkMonitor = nullptr;
     if (enableLinkUtil)
     {
@@ -435,7 +434,7 @@ main(int argc, char* argv[])
                                                                  << "s, Output=" << linkUtilXmlFile);
     }
 
-    // --- [修改] TCP Pacing 关键配置 (从 example 复制) ---
+    // --- TCP Pacing 关键配置 (从 example 复制) ---
     NS_LOG_INFO("Enabling TCP Cubic and Pacing...");
     Config::SetDefault("ns3::TcpL4Protocol::SocketType", 
                        TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
@@ -443,7 +442,7 @@ main(int argc, char* argv[])
                        BooleanValue(true));
     Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", 
                        BooleanValue(true));
-    // --- [结束] TCP Pacing ---
+    // --- TCP Pacing ---
 
     // 确保 XML 输出在 scratch 目录下
     if (proSinkXmlFile.rfind("scratch/ns3-dsw/out/", 0) != 0)
@@ -562,7 +561,7 @@ main(int argc, char* argv[])
     // 链路安装（保留原始方向 a->b）
     std::set<std::pair<uint32_t, uint32_t>> seen; // 去重（无向）
     std::map<std::pair<uint32_t, uint32_t>, IfRecord> ifMap;
-    NetDeviceContainer allP2pDevices; // [修改] 收集所有 P2P 设备, 用于 TCH
+    NetDeviceContainer allP2pDevices; // 收集所有 P2P 设备, 用于 TCH
 
     for (const auto& l : linkSpecs)
     {
@@ -598,12 +597,9 @@ main(int argc, char* argv[])
             p2p.SetChannelAttribute("Delay", TimeValue(MilliSeconds(1)));
         }
         
-        // [修改] 移除 SetQueue，改用 TCH
-        // p2p.SetQueue("ns3::DropTailQueue<Packet>", "MaxSize", StringValue("100p"));
-
         // 原始方向：a 在前、b 在后 -> IP 地址 index 0 属于 a，index 1 属于 b
         NetDeviceContainer dev = p2p.Install(nodes.Get(l.a), nodes.Get(l.b));
-        allP2pDevices.Add(dev); // [修改] 将设备添加到容器
+        allP2pDevices.Add(dev); // 将设备添加到容器
         
         Ipv4InterfaceContainer ifc = address.Assign(dev);
         address.NewNetwork();
@@ -638,7 +634,7 @@ main(int argc, char* argv[])
         ifMap[undirected] = rec;
     }
 
-    // --- [修改] 在安装 FqCoDel 之前，删除 P2PHelper 自动安装的默认 QueueDisc ---
+    // --- 在安装 FqCoDel 之前，删除 P2PHelper 自动安装的默认 QueueDisc ---
     NS_LOG_INFO("Deleting default QueueDiscs installed by P2P helper...");
     for (uint32_t i = 0; i < allP2pDevices.GetN(); ++i)
     {
@@ -652,14 +648,13 @@ main(int argc, char* argv[])
             tc->DeleteRootQueueDiscOnDevice(dev);
         }
     }
-    // --- [修改] 安装 FqCoDel 队列以支持 Pacing ---
+    // --- 安装 FqCoDel 队列以支持 Pacing ---
     NS_LOG_INFO("Installing FqCoDel queue disc on all P2P devices for Pacing...");
     TrafficControlHelper tch;
     tch.SetRootQueueDisc("ns3::FqCoDelQueueDisc");
     tch.Install(allP2pDevices);
-    // --- [结束] FqCoDel ---
 
-    // --- [修正] 在 *安装完* 最终的 QueueDisc (FqCoDel) 之后再注册链路监控 ---
+    // --- 注册链路监控 ---
     if (enableLinkUtil && linkMonitor)
     {
         NS_LOG_INFO("Registering links with LinkUtilizationMonitor (post-TCH)...");
@@ -697,7 +692,6 @@ main(int argc, char* argv[])
             NS_LOG_WARN("Node " << nodeId << " has no P2P interfaces, cannot be reached.");
             continue;
         }
-        // 使用接口1 (0是loopback) 上的第一个 IP 地址
         Ipv4Address ip = ipv4->GetAddress(1, 0).GetLocal();
         nodeIpMap[nodeId] = ip;
         NS_LOG_DEBUG("Node " << nodeId << " mapped to routable IP: " << ip);
@@ -902,7 +896,7 @@ main(int argc, char* argv[])
     Simulator::Stop(simStopTime);
     NS_LOG_INFO("Simulation will stop at " << simStopTime.GetSeconds() << "s.");
 
-    // [新增] 调度链路监控器的启动和停止
+    // 调度链路监控器的启动和停止
     if (enableLinkUtil && linkMonitor)
     {
         // 在 App 启动时开始监控

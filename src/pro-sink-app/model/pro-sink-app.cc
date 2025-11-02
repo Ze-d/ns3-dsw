@@ -176,17 +176,6 @@ void
 MySink::StopApplication()
 {
     m_running = false;
-    
-    // 关闭所有接受的连接
-    // for (auto const& socket : m_acceptedSockets)
-    // {
-    //     if (socket != nullptr)
-    //     {
-    //         socket->Close();
-    //     }
-    // }
-    // m_acceptedSockets.clear();
-    // m_socketBuffers.clear();
 
     // 关闭监听套接字
     if (m_listenSocket != nullptr)
@@ -285,7 +274,7 @@ MySink::ProcessSocketBuffer(Ptr<Socket> socket)
         TaskHeader header;
         header.Deserialize(it);
 
-        // 2. 从缓冲区移除包头 (严格遵守教训 5)
+        // 2. 从缓冲区移除包头
         buffer.RemoveAtStart(headerSize);
 
         // 3. 识别任务 (我们知道 payload 大小，所以只需累加)
@@ -295,7 +284,7 @@ MySink::ProcessSocketBuffer(Ptr<Socket> socket)
 
         m_currentRxBytesPerTask[taskKey] += payloadSize;
 
-        // 4. 从缓冲区移除 Payload (严格遵守教训 5)
+        // 4. 从缓冲区移除 Payload
         buffer.RemoveAtStart(payloadSize);
 
         // 5. 检查任务是否完整接收
@@ -327,7 +316,7 @@ MySink::ProcessTasks()
          // 队列为空：累加空闲时间，不累积处理信用点
          m_idleTimeInInterval += m_simulationStep;
          
-         // (可选) 如果您希望在队列为空时清除任何剩余的 < 1.0 的信用点：
+         //在队列为空时清除任何剩余的 < 1.0 的信用点：
          m_processingCredit = 0.0; 
      }
      else
@@ -461,7 +450,6 @@ MyProducer::StartApplication()
     TypeId tid = TypeId::LookupByName("ns3::TcpSocketFactory");
     m_socket = Socket::CreateSocket(GetNode(), tid);
     
-    // 严格遵守教训 1, 2, 4：设置所有状态管理回调
     m_socket->SetConnectCallback(MakeCallback(&MyProducer::ConnectionSucceeded, this),
                                  MakeCallback(&MyProducer::ConnectionFailed, this));
     m_socket->SetSendCallback(MakeCallback(&MyProducer::HandleSend, this));
