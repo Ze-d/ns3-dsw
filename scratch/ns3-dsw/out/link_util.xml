@@ -67,7 +67,7 @@
     </Link>
     <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
       <AtoB rateBps="258304.000000" rateMbps="0.258304" utilPct="2.583040" bytes="8072" />
-      <BtoA rateBps="10800896.000000" rateMbps="10.800896" utilPct="108.008960" bytes="337528" />
+      <BtoA rateBps="10800896.000000" rateMbps="10.000000" utilPct="100.000000" bytes="337528" />
     </Link>
     <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
       <AtoB rateBps="137344.000000" rateMbps="0.137344" utilPct="1.373440" bytes="4292" />

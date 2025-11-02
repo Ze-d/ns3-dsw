@@ -316,18 +316,27 @@ void
 MySink::ProcessTasks()
 {
     if (!m_running) return;
+
      // --- 1. 算力利用率跟踪 (高精度轮询) ---
      // 累加总时间 (以 simulationStep 为单位)
      m_totalTimeInInterval += m_simulationStep;
  
-     // 仅当队列为空时 (即本个 step 处理器没事做)，累加空闲时间
+     // 检查队列状态
      if (m_taskQueue.empty())
      {
+         // 队列为空：累加空闲时间，不累积处理信用点
          m_idleTimeInInterval += m_simulationStep;
+         
+         // (可选) 如果您希望在队列为空时清除任何剩余的 < 1.0 的信用点：
+         m_processingCredit = 0.0; 
+     }
+     else
+     {
+         // 队列非空：不累加空闲时间，但累积处理信用点
+         m_processingCredit += m_tasksPerSecond * m_simulationStep.GetSeconds();
      }
  
      // --- 2. 现有任务处理逻辑 ---
-    m_processingCredit += m_tasksPerSecond * m_simulationStep.GetSeconds();
     uint32_t tasksToProcess = floor(m_processingCredit);
     for (uint32_t i = 0; i < tasksToProcess && !m_taskQueue.empty(); ++i)
     {

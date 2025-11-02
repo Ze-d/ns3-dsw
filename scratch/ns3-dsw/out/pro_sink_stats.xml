@@ -10,152 +10,145 @@
   <Event type="EdgeSend" Time="0.04" Edge-Id="Edge-5" Task-Id="5-1" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.049" Edge-Id="Edge-11" Task-Id="11-1" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.0722618" Edge-Id="Edge-5" Task-Id="5-2" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.09" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-1" TotalCompleted="1"/>
-  <Event type="CoreComp" Time="0.093" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-1" TotalCompleted="1"/>
   <Event type="EdgeSend" Time="0.095" Edge-Id="Edge-11" Task-Id="11-2" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.097" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-1" TotalCompleted="1"/>
-  <Event type="CoreComp" Time="0.099" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-1" TotalCompleted="2"/>
   <Event type="EdgeSend" Time="0.104557" Edge-Id="Edge-5" Task-Id="5-3" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.116" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-2" TotalCompleted="2"/>
   <Event type="EdgeSend" Time="0.124" Edge-Id="Edge-7" Task-Id="7-1" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.124" Edge-Id="Edge-11" Task-Id="11-3" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.125" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-2" TotalCompleted="3"/>
+  <Event type="CoreComp" Time="0.126" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-1" TotalCompleted="1"/>
+  <Event type="CoreComp" Time="0.136" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-1" TotalCompleted="1"/>
+  <Event type="CoreComp" Time="0.139" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-1" TotalCompleted="1"/>
   <Event type="EdgeSend" Time="0.141" Edge-Id="Edge-1" Task-Id="1-1" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.15" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-3" TotalCompleted="3"/>
-  <Event type="CoreComp" Time="0.161" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-3" TotalCompleted="4"/>
   <Event type="EdgeSend" Time="0.165" Edge-Id="Edge-14" Task-Id="14-2" TargetIp="10.0.2.2"/>
+  <Event type="CoreComp" Time="0.176" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-1" TotalCompleted="2"/>
   <Event type="EdgeSend" Time="0.183" Edge-Id="Edge-5" Task-Id="5-4" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.185" Edge-Id="Edge-11" Task-Id="11-4" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.2" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-1" TotalCompleted="4"/>
-  <Event type="CoreComp" Time="0.201" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-2" TotalCompleted="5"/>
+  <Event type="CoreComp" Time="0.189" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-2" TotalCompleted="2"/>
   <Event type="EdgeSend" Time="0.210408" Edge-Id="Edge-3" Task-Id="3-2" TargetIp="10.0.2.2"/>
+  <Event type="CoreComp" Time="0.216" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-2" TotalCompleted="3"/>
   <Event type="EdgeSend" Time="0.225" Edge-Id="Edge-12" Task-Id="12-2" TargetIp="10.0.6.2"/>
   <Event type="EdgeSend" Time="0.232" Edge-Id="Edge-14" Task-Id="14-3" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.237765" Edge-Id="Edge-8" Task-Id="8-2" TargetIp="10.0.6.2"/>
-  <Event type="CoreComp" Time="0.241" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-4" TotalCompleted="6"/>
-  <Event type="CoreComp" Time="0.25" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-4" TotalCompleted="5"/>
-  <Event type="CoreComp" Time="0.261" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-2" TotalCompleted="2"/>
+  <Event type="CoreComp" Time="0.239" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-3" TotalCompleted="3"/>
+  <Event type="CoreComp" Time="0.256" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-3" TotalCompleted="4"/>
   <Event type="EdgeSend" Time="0.275278" Edge-Id="Edge-4" Task-Id="4-2" TargetIp="10.0.6.2"/>
-  <Event type="CoreComp" Time="0.281" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-3" TotalCompleted="7"/>
+  <Event type="CoreComp" Time="0.289" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-1" TotalCompleted="4"/>
+  <Event type="CoreComp" Time="0.294" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-2" TotalCompleted="2"/>
+  <Event type="CoreComp" Time="0.296" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-2" TotalCompleted="5"/>
   <Event type="EdgeSend" Time="0.313" Edge-Id="Edge-1" Task-Id="1-2" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.321" Core-Id="Core-6" Edge-Id="Edge-3" Task-Id="3-1" TotalCompleted="8"/>
   <Event type="EdgeSend" Time="0.322" Edge-Id="Edge-12" Task-Id="12-3" TargetIp="10.0.6.2"/>
   <Event type="EdgeSend" Time="0.330412" Edge-Id="Edge-1" Task-Id="1-3" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.341" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-2" TotalCompleted="6"/>
-  <Event type="CoreComp" Time="0.354" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-3" TotalCompleted="3"/>
-  <Event type="CoreComp" Time="0.364" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-3" TotalCompleted="7"/>
+  <Event type="CoreComp" Time="0.336" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-4" TotalCompleted="6"/>
+  <Event type="CoreComp" Time="0.339" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-4" TotalCompleted="5"/>
+  <Event type="CoreComp" Time="0.376" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-3" TotalCompleted="7"/>
+  <Event type="CoreComp" Time="0.387" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-3" TotalCompleted="3"/>
   <Event type="EdgeSend" Time="0.387173" Edge-Id="Edge-10" Task-Id="10-2" TargetIp="10.0.9.2"/>
+  <Event type="CoreComp" Time="0.39" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-2" TotalCompleted="6"/>
   <Event type="EdgeSend" Time="0.397195" Edge-Id="Edge-13" Task-Id="13-2" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.398" Edge-Id="Edge-12" Task-Id="12-4" TargetIp="10.0.6.2"/>
-  <Event type="CoreComp" Time="0.424" Core-Id="Core-9" Edge-Id="Edge-8" Task-Id="8-1" TotalCompleted="4"/>
-  <Event type="CoreComp" Time="0.43" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-4" TotalCompleted="5"/>
+  <Event type="CoreComp" Time="0.416" Core-Id="Core-6" Edge-Id="Edge-3" Task-Id="3-1" TotalCompleted="8"/>
+  <Event type="CoreComp" Time="0.44" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-3" TotalCompleted="7"/>
   <Event type="EdgeSend" Time="0.442" Edge-Id="Edge-5" Task-Id="5-5" TargetIp="10.0.9.2"/>
+  <Event type="CoreComp" Time="0.457" Core-Id="Core-9" Edge-Id="Edge-8" Task-Id="8-1" TotalCompleted="4"/>
   <Event type="EdgeSend" Time="0.46" Edge-Id="Edge-14" Task-Id="14-4" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.473" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-5" TotalCompleted="8"/>
   <Event type="EdgeSend" Time="0.476" Edge-Id="Edge-1" Task-Id="1-4" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.482112" Edge-Id="Edge-14" Task-Id="14-5" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.489" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-4" TotalCompleted="9"/>
+  <Event type="CoreComp" Time="0.49" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-4" TotalCompleted="5"/>
   <Event type="EdgeSend" Time="0.491" Edge-Id="Edge-11" Task-Id="11-5" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.502" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-4" TotalCompleted="9"/>
   <Event type="EdgeSend" Time="0.510142" Edge-Id="Edge-11" Task-Id="11-6" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.513" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-5" TotalCompleted="10"/>
   <Event type="EdgeSend" Time="0.514" Edge-Id="Edge-14" Task-Id="14-6" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.521" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-5" TotalCompleted="11"/>
+  <Event type="CoreComp" Time="0.522" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-5" TotalCompleted="8"/>
+  <Event type="CoreComp" Time="0.528" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-4" TotalCompleted="9"/>
   <Event type="EdgeSend" Time="0.536696" Edge-Id="Edge-3" Task-Id="3-3" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.541" Edge-Id="Edge-1" Task-Id="1-5" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.544" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-6" TotalCompleted="12"/>
-  <Event type="CoreComp" Time="0.545" Core-Id="Core-2" Edge-Id="Edge-13" Task-Id="13-1" TotalCompleted="10"/>
-  <Event type="CoreComp" Time="0.546" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-6" TotalCompleted="13"/>
   <Event type="EdgeSend" Time="0.547" Edge-Id="Edge-14" Task-Id="14-7" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.556" Core-Id="Core-9" Edge-Id="Edge-4" Task-Id="4-1" TotalCompleted="6"/>
   <Event type="EdgeSend" Time="0.558" Edge-Id="Edge-11" Task-Id="11-7" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.563" Core-Id="Core-2" Edge-Id="Edge-10" Task-Id="10-1" TotalCompleted="11"/>
+  <Event type="CoreComp" Time="0.568" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-5" TotalCompleted="10"/>
   <Event type="EdgeSend" Time="0.56949" Edge-Id="Edge-14" Task-Id="14-8" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.577" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-7" TotalCompleted="14"/>
+  <Event type="CoreComp" Time="0.572" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-4" TotalCompleted="9"/>
+  <Event type="CoreComp" Time="0.589" Core-Id="Core-9" Edge-Id="Edge-4" Task-Id="4-1" TotalCompleted="6"/>
   <Event type="EdgeSend" Time="0.594489" Edge-Id="Edge-14" Task-Id="14-9" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.6" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-5" TotalCompleted="12"/>
-  <Event type="CoreComp" Time="0.601" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-7" TotalCompleted="15"/>
+  <Event type="CoreComp" Time="0.608" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-5" TotalCompleted="11"/>
   <Event type="EdgeSend" Time="0.617" Edge-Id="Edge-12" Task-Id="12-5" TargetIp="10.0.6.2"/>
   <Event type="EdgeSend" Time="0.618" Edge-Id="Edge-11" Task-Id="11-8" TargetIp="10.0.2.2"/>
+  <Event type="CoreComp" Time="0.622" Core-Id="Core-2" Edge-Id="Edge-13" Task-Id="13-1" TotalCompleted="10"/>
   <Event type="EdgeSend" Time="0.640381" Edge-Id="Edge-8" Task-Id="8-3" TargetIp="10.0.6.2"/>
-  <Event type="CoreComp" Time="0.641" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-8" TotalCompleted="16"/>
   <Event type="EdgeSend" Time="0.642" Edge-Id="Edge-1" Task-Id="1-6" TargetIp="10.0.9.2"/>
+  <Event type="CoreComp" Time="0.648" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-6" TotalCompleted="12"/>
   <Event type="EdgeSend" Time="0.649" Edge-Id="Edge-5" Task-Id="5-6" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.649" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-5" TotalCompleted="7"/>
   <Event type="EdgeSend" Time="0.651" Edge-Id="Edge-14" Task-Id="14-10" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.656443" Edge-Id="Edge-7" Task-Id="7-2" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.658" Edge-Id="Edge-11" Task-Id="11-9" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.668" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-6" TotalCompleted="13"/>
+  <Event type="CoreComp" Time="0.672" Core-Id="Core-2" Edge-Id="Edge-10" Task-Id="10-1" TotalCompleted="11"/>
   <Event type="EdgeSend" Time="0.673254" Edge-Id="Edge-14" Task-Id="14-11" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.681" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-9" TotalCompleted="17"/>
-  <Event type="CoreComp" Time="0.7" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-6" TotalCompleted="14"/>
+  <Event type="CoreComp" Time="0.682" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-5" TotalCompleted="7"/>
+  <Event type="CoreComp" Time="0.688" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-6" TotalCompleted="13"/>
   <Event type="EdgeSend" Time="0.703" Edge-Id="Edge-14" Task-Id="14-12" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.721" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-8" TotalCompleted="18"/>
+  <Event type="CoreComp" Time="0.722" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-5" TotalCompleted="12"/>
+  <Event type="CoreComp" Time="0.728" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-7" TotalCompleted="14"/>
   <Event type="EdgeSend" Time="0.731" Edge-Id="Edge-1" Task-Id="1-7" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.739" Edge-Id="Edge-5" Task-Id="5-7" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.757" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-7" TotalCompleted="15"/>
-  <Event type="CoreComp" Time="0.761" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-10" TotalCompleted="19"/>
+  <Event type="CoreComp" Time="0.768" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-7" TotalCompleted="15"/>
+  <Event type="CoreComp" Time="0.772" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-6" TotalCompleted="13"/>
   <Event type="EdgeSend" Time="0.784231" Edge-Id="Edge-4" Task-Id="4-3" TargetIp="10.0.6.2"/>
   <Event type="EdgeSend" Time="0.785" Edge-Id="Edge-11" Task-Id="11-10" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.79" Edge-Id="Edge-5" Task-Id="5-8" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.795" Edge-Id="Edge-1" Task-Id="1-8" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.8" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-7" TotalCompleted="16"/>
-  <Event type="CoreComp" Time="0.801" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-9" TotalCompleted="20"/>
+  <Event type="CoreComp" Time="0.808" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-8" TotalCompleted="16"/>
   <Event type="EdgeSend" Time="0.820981" Edge-Id="Edge-13" Task-Id="13-3" TargetIp="10.0.9.2"/>
+  <Event type="CoreComp" Time="0.822" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-6" TotalCompleted="14"/>
   <Event type="EdgeSend" Time="0.83" Edge-Id="Edge-11" Task-Id="11-11" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.838" Edge-Id="Edge-14" Task-Id="14-13" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.841" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-11" TotalCompleted="21"/>
-  <Event type="CoreComp" Time="0.85" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-8" TotalCompleted="17"/>
+  <Event type="CoreComp" Time="0.848" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-9" TotalCompleted="17"/>
   <Event type="EdgeSend" Time="0.857" Edge-Id="Edge-5" Task-Id="5-9" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.866141" Edge-Id="Edge-10" Task-Id="10-3" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="0.871958" Edge-Id="Edge-5" Task-Id="5-10" TargetIp="10.0.9.2"/>
+  <Event type="CoreComp" Time="0.872" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-7" TotalCompleted="15"/>
   <Event type="EdgeSend" Time="0.878" Edge-Id="Edge-1" Task-Id="1-9" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.881" Core-Id="Core-6" Edge-Id="Edge-3" Task-Id="3-2" TotalCompleted="22"/>
+  <Event type="CoreComp" Time="0.888" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-8" TotalCompleted="18"/>
   <Event type="EdgeSend" Time="0.897" Edge-Id="Edge-11" Task-Id="11-12" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.9" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-8" TotalCompleted="18"/>
-  <Event type="CoreComp" Time="0.909" Core-Id="Core-9" Edge-Id="Edge-8" Task-Id="8-2" TotalCompleted="8"/>
-  <Event type="CoreComp" Time="0.921" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-12" TotalCompleted="23"/>
+  <Event type="CoreComp" Time="0.922" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-7" TotalCompleted="16"/>
+  <Event type="CoreComp" Time="0.928" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-10" TotalCompleted="19"/>
   <Event type="EdgeSend" Time="0.941" Edge-Id="Edge-12" Task-Id="12-6" TargetIp="10.0.6.2"/>
+  <Event type="CoreComp" Time="0.942" Core-Id="Core-9" Edge-Id="Edge-8" Task-Id="8-2" TotalCompleted="8"/>
   <Event type="EdgeSend" Time="0.943" Edge-Id="Edge-14" Task-Id="14-14" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.95" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-9" TotalCompleted="19"/>
   <Event type="EdgeSend" Time="0.955" Edge-Id="Edge-1" Task-Id="1-10" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="0.961" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-10" TotalCompleted="24"/>
-  <Event type="CoreComp" Time="0.968" Core-Id="Core-9" Edge-Id="Edge-4" Task-Id="4-2" TotalCompleted="9"/>
+  <Event type="CoreComp" Time="0.968" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-9" TotalCompleted="20"/>
+  <Event type="CoreComp" Time="0.972" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-8" TotalCompleted="17"/>
   <Event type="EdgeSend" Time="0.978167" Edge-Id="Edge-3" Task-Id="3-4" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="0.979" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-6" TotalCompleted="10"/>
   <Event type="EdgeSend" Time="0.983" Edge-Id="Edge-11" Task-Id="11-13" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="0.998" Edge-Id="Edge-11" Task-Id="11-14" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="1" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-9" TotalCompleted="20"/>
-  <Event type="CoreComp" Time="1.001" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-11" TotalCompleted="25"/>
+  <Event type="CoreComp" Time="1.001" Core-Id="Core-9" Edge-Id="Edge-4" Task-Id="4-2" TotalCompleted="9"/>
+  <Event type="CoreComp" Time="1.008" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-11" TotalCompleted="21"/>
+  <Event type="CoreComp" Time="1.022" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-8" TotalCompleted="18"/>
   <Event type="EdgeSend" Time="1.02241" Edge-Id="Edge-11" Task-Id="11-15" TargetIp="10.0.2.2"/>
   <Event type="EdgeSend" Time="1.027" Edge-Id="Edge-14" Task-Id="14-15" TargetIp="10.0.2.2"/>
+  <Event type="CoreComp" Time="1.034" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-6" TotalCompleted="10"/>
   <Event type="EdgeSend" Time="1.04" Edge-Id="Edge-1" Task-Id="1-11" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="1.041" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-13" TotalCompleted="26"/>
   <Event type="EdgeSend" Time="1.043" Edge-Id="Edge-5" Task-Id="5-11" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="1.04689" Edge-Id="Edge-11" Task-Id="11-16" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="1.05" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-10" TotalCompleted="21"/>
+  <Event type="CoreComp" Time="1.048" Core-Id="Core-6" Edge-Id="Edge-3" Task-Id="3-2" TotalCompleted="22"/>
   <Event type="EdgeSend" Time="1.065" Edge-Id="Edge-14" Task-Id="14-16" TargetIp="10.0.2.2"/>
+  <Event type="CoreComp" Time="1.072" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-9" TotalCompleted="19"/>
   <Event type="EdgeSend" Time="1.076" Edge-Id="Edge-1" Task-Id="1-12" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="1.081" Core-Id="Core-6" Edge-Id="Edge-7" Task-Id="7-1" TotalCompleted="27"/>
+  <Event type="CoreComp" Time="1.088" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-12" TotalCompleted="23"/>
   <Event type="EdgeSend" Time="1.1" Edge-Id="Edge-1" Task-Id="1-13" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="1.1" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-10" TotalCompleted="22"/>
   <Event type="EdgeSend" Time="1.108" Edge-Id="Edge-12" Task-Id="12-7" TargetIp="10.0.6.2"/>
-  <Event type="CoreComp" Time="1.121" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-12" TotalCompleted="28"/>
-  <Event type="CoreComp" Time="1.14" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-7" TotalCompleted="11"/>
+  <Event type="CoreComp" Time="1.122" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-9" TotalCompleted="20"/>
+  <Event type="CoreComp" Time="1.128" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-10" TotalCompleted="24"/>
   <Event type="EdgeSend" Time="1.14354" Edge-Id="Edge-7" Task-Id="7-3" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="1.15" Core-Id="Core-2" Edge-Id="Edge-13" Task-Id="13-2" TotalCompleted="23"/>
   <Event type="EdgeSend" Time="1.15" Edge-Id="Edge-5" Task-Id="5-12" TargetIp="10.0.9.2"/>
-  <Event type="CoreComp" Time="1.161" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-14" TotalCompleted="29"/>
+  <Event type="CoreComp" Time="1.168" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-11" TotalCompleted="25"/>
+  <Event type="CoreComp" Time="1.172" Core-Id="Core-2" Edge-Id="Edge-5" Task-Id="5-10" TotalCompleted="21"/>
+  <Event type="CoreComp" Time="1.173" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-7" TotalCompleted="11"/>
   <Event type="EdgeSend" Time="1.17958" Edge-Id="Edge-4" Task-Id="4-4" TargetIp="10.0.6.2"/>
   <Event type="EdgeSend" Time="1.183" Edge-Id="Edge-5" Task-Id="5-13" TargetIp="10.0.9.2"/>
   <Event type="EdgeSend" Time="1.189" Edge-Id="Edge-12" Task-Id="12-8" TargetIp="10.0.6.2"/>
   <Event type="EdgeSend" Time="1.194" Edge-Id="Edge-14" Task-Id="14-17" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="1.2" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-11" TotalCompleted="24"/>
-  <Event type="CoreComp" Time="1.201" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-13" TotalCompleted="30"/>
+  <Event type="CoreComp" Time="1.208" Core-Id="Core-6" Edge-Id="Edge-14" Task-Id="14-13" TotalCompleted="26"/>
   <Event type="EdgeSend" Time="1.21197" Edge-Id="Edge-8" Task-Id="8-4" TargetIp="10.0.6.2"/>
+  <Event type="CoreComp" Time="1.222" Core-Id="Core-2" Edge-Id="Edge-1" Task-Id="1-10" TotalCompleted="22"/>
   <Event type="EdgeSend" Time="1.222" Edge-Id="Edge-14" Task-Id="14-18" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="1.228" Core-Id="Core-9" Edge-Id="Edge-12" Task-Id="12-8" TotalCompleted="12"/>
   <Event type="EdgeSend" Time="1.239" Edge-Id="Edge-11" Task-Id="11-17" TargetIp="10.0.2.2"/>
-  <Event type="CoreComp" Time="1.241" Core-Id="Core-6" Edge-Id="Edge-11" Task-Id="11-14" TotalCompleted="31"/>
+  <Event type="CoreComp" Time="1.248" Core-Id="Core-6" Edge-Id="Edge-7" Task-Id="7-1" TotalCompleted="27"/>
   <Event type="EdgeSend" Time="1.248" Edge-Id="Edge-14" Task-Id="14-19" TargetIp="10.0.2.2"/>
 </ProSinkStats>

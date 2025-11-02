@@ -245,8 +245,10 @@ LinkUtilizationMonitor::PollStats()
         // 4.3 计算利用率 (U = R / C * 100)
         double capacity_bps = link.rate.GetBitRate();
         double capacity_Mbps = capacity_bps / 1e6;
-        double utilA_pct = (capacity_bps > 0) ? (rateA_bps / capacity_bps) * 100.0 : 0.0;
-        double utilB_pct = (capacity_bps > 0) ? (rateB_bps / capacity_bps) * 100.0 : 0.0;
+        rateA_Mbps = std::min(rateA_Mbps, capacity_Mbps);
+        rateB_Mbps = std::min(rateB_Mbps, capacity_Mbps);
+        double utilA_pct = (capacity_bps > 0) ? (rateA_Mbps / capacity_Mbps) * 100.0 : 0.0;
+        double utilB_pct = (capacity_bps > 0) ? (rateB_Mbps / capacity_Mbps) * 100.0 : 0.0;
 
         totalUtilPct += utilA_pct + utilB_pct;
 
