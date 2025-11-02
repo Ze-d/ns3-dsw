@@ -613,11 +613,25 @@ main(int argc, char* argv[])
         ifMap[undirected] = rec;
     }
 
+    // --- [新增] 在安装 FqCoDel 之前，删除 P2PHelper 自动安装的默认 QueueDisc ---
+    NS_LOG_INFO("Deleting default QueueDiscs installed by P2P helper...");
+    for (uint32_t i = 0; i < allP2pDevices.GetN(); ++i)
+    {
+        Ptr<NetDevice> dev = allP2pDevices.Get(i);
+        Ptr<Node> node = dev->GetNode();
+        // 从节点获取 TC-Layer
+        Ptr<TrafficControlLayer> tc = node->GetObject<TrafficControlLayer>();
+        if (tc)
+        {
+            // 删除该设备上已有的根 QueueDisc
+            tc->DeleteRootQueueDiscOnDevice(dev);
+        }
+    }
     // --- [新增] 安装 FqCoDel 队列以支持 Pacing ---
     NS_LOG_INFO("Installing FqCoDel queue disc on all P2P devices for Pacing...");
-    // TrafficControlHelper tch;测试
-    // tch.SetRootQueueDisc("ns3::FqCoDelQueueDisc");
-    // tch.Install(allP2pDevices);
+    TrafficControlHelper tch;
+    tch.SetRootQueueDisc("ns3::FqCoDelQueueDisc");
+    tch.Install(allP2pDevices);
     // --- [结束] FqCoDel ---
 
     if (ifMap.empty())

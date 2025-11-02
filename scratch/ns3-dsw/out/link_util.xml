@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LinkUtilizationStats interval="0.25">
+  <Sample time="0.000000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+  </Sample>
+  <Sample time="0.250000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="18060160.000000" rateMbps="18.060160" utilPct="18.060160" />
+      <BtoA rateBps="615808.000000" rateMbps="0.615808" utilPct="0.615808" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="17655040.000000" rateMbps="17.655040" utilPct="17.655040" />
+      <BtoA rateBps="26797440.000000" rateMbps="26.797440" utilPct="26.797440" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="29280512.000000" rateMbps="29.280512" utilPct="29.280512" />
+      <BtoA rateBps="1209984.000000" rateMbps="1.209984" utilPct="1.209984" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="1770752.000000" rateMbps="1.770752" utilPct="1.770752" />
+      <BtoA rateBps="41507840.000000" rateMbps="41.507840" utilPct="41.507840" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="126592.000000" rateMbps="0.126592" utilPct="0.126592" />
+      <BtoA rateBps="4444032.000000" rateMbps="4.444032" utilPct="4.444032" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="652416.000000" rateMbps="0.652416" utilPct="0.652416" />
+      <BtoA rateBps="15099776.000000" rateMbps="15.099776" utilPct="15.099776" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="9277952.000000" rateMbps="9.277952" utilPct="9.277952" />
+      <BtoA rateBps="412800.000000" rateMbps="0.412800" utilPct="0.412800" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="11330048.000000" rateMbps="11.330048" utilPct="11.330048" />
+      <BtoA rateBps="45281920.000000" rateMbps="45.281920" utilPct="45.281920" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="10112.000000" rateMbps="0.010112" utilPct="0.010112" />
+      <BtoA rateBps="530304.000000" rateMbps="0.530304" utilPct="0.530304" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="286336.000000" rateMbps="0.286336" utilPct="0.286336" />
+      <BtoA rateBps="9467904.000000" rateMbps="9.467904" utilPct="9.467904" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="9622400.000000" rateMbps="9.622400" utilPct="96.224000" />
+      <BtoA rateBps="9781760.000000" rateMbps="9.781760" utilPct="97.817600" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="419584.000000" rateMbps="0.419584" utilPct="4.195840" />
+      <BtoA rateBps="11183616.000000" rateMbps="11.183616" utilPct="111.836160" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="223104.000000" rateMbps="0.223104" utilPct="2.231040" />
+      <BtoA rateBps="6175104.000000" rateMbps="6.175104" utilPct="61.751040" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="725120.000000" rateMbps="0.725120" utilPct="7.251200" />
+      <BtoA rateBps="5093888.000000" rateMbps="5.093888" utilPct="50.938880" />
+    </Link>
+  </Sample>
+  <Sample time="0.500000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="19091200.000000" rateMbps="19.091200" utilPct="19.091200" />
+      <BtoA rateBps="1051648.000000" rateMbps="1.051648" utilPct="1.051648" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="21343488.000000" rateMbps="21.343488" utilPct="21.343488" />
+      <BtoA rateBps="19021440.000000" rateMbps="19.021440" utilPct="19.021440" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="21788672.000000" rateMbps="21.788672" utilPct="21.788672" />
+      <BtoA rateBps="1230976.000000" rateMbps="1.230976" utilPct="1.230976" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="430208.000000" rateMbps="0.430208" utilPct="0.430208" />
+      <BtoA rateBps="5889408.000000" rateMbps="5.889408" utilPct="5.889408" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="373120.000000" rateMbps="0.373120" utilPct="0.373120" />
+      <BtoA rateBps="3970176.000000" rateMbps="3.970176" utilPct="3.970176" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="1015040.000000" rateMbps="1.015040" utilPct="1.015040" />
+      <BtoA rateBps="22051584.000000" rateMbps="22.051584" utilPct="22.051584" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="27823488.000000" rateMbps="27.823488" utilPct="27.823488" />
+      <BtoA rateBps="1211392.000000" rateMbps="1.211392" utilPct="1.211392" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="7928704.000000" rateMbps="7.928704" utilPct="7.928704" />
+      <BtoA rateBps="18998656.000000" rateMbps="18.998656" utilPct="18.998656" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="96512.000000" rateMbps="0.096512" utilPct="0.096512" />
+      <BtoA rateBps="2389632.000000" rateMbps="2.389632" utilPct="2.389632" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="635008.000000" rateMbps="0.635008" utilPct="0.635008" />
+      <BtoA rateBps="6654464.000000" rateMbps="6.654464" utilPct="6.654464" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="8453504.000000" rateMbps="8.453504" utilPct="84.535040" />
+      <BtoA rateBps="9967104.000000" rateMbps="9.967104" utilPct="99.671040" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="440960.000000" rateMbps="0.440960" utilPct="4.409600" />
+      <BtoA rateBps="10123008.000000" rateMbps="10.123008" utilPct="101.230080" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="266240.000000" rateMbps="0.266240" utilPct="2.662400" />
+      <BtoA rateBps="6322176.000000" rateMbps="6.322176" utilPct="63.221760" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="2581504.000000" rateMbps="2.581504" utilPct="25.815040" />
+      <BtoA rateBps="4215552.000000" rateMbps="4.215552" utilPct="42.155520" />
+    </Link>
+  </Sample>
+  <Sample time="0.750000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="9291136.000000" rateMbps="9.291136" utilPct="9.291136" />
+      <BtoA rateBps="419328.000000" rateMbps="0.419328" utilPct="0.419328" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="12494336.000000" rateMbps="12.494336" utilPct="12.494336" />
+      <BtoA rateBps="67816576.000000" rateMbps="67.816576" utilPct="67.816576" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="73955200.000000" rateMbps="73.955200" utilPct="73.955200" />
+      <BtoA rateBps="3377024.000000" rateMbps="3.377024" utilPct="3.377024" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="2199424.000000" rateMbps="2.199424" utilPct="2.199424" />
+      <BtoA rateBps="48969088.000000" rateMbps="48.969088" utilPct="48.969088" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="206464.000000" rateMbps="0.206464" utilPct="0.206464" />
+      <BtoA rateBps="4497024.000000" rateMbps="4.497024" utilPct="4.497024" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="419328.000000" rateMbps="0.419328" utilPct="0.419328" />
+      <BtoA rateBps="9291136.000000" rateMbps="9.291136" utilPct="9.291136" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="27823488.000000" rateMbps="27.823488" utilPct="27.823488" />
+      <BtoA rateBps="1143168.000000" rateMbps="1.143168" utilPct="1.143168" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="6685184.000000" rateMbps="6.685184" utilPct="6.685184" />
+      <BtoA rateBps="24453760.000000" rateMbps="24.453760" utilPct="24.453760" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="173056.000000" rateMbps="0.173056" utilPct="0.173056" />
+      <BtoA rateBps="4233600.000000" rateMbps="4.233600" utilPct="4.233600" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="331136.000000" rateMbps="0.331136" utilPct="0.331136" />
+      <BtoA rateBps="5701248.000000" rateMbps="5.701248" utilPct="5.701248" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="9709312.000000" rateMbps="9.709312" utilPct="97.093120" />
+      <BtoA rateBps="9985536.000000" rateMbps="9.985536" utilPct="99.855360" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="595712.000000" rateMbps="0.595712" utilPct="5.957120" />
+      <BtoA rateBps="9765504.000000" rateMbps="9.765504" utilPct="97.655040" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="381056.000000" rateMbps="0.381056" utilPct="3.810560" />
+      <BtoA rateBps="4346496.000000" rateMbps="4.346496" utilPct="43.464960" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="4468736.000000" rateMbps="4.468736" utilPct="44.687360" />
+      <BtoA rateBps="5291008.000000" rateMbps="5.291008" utilPct="52.910080" />
+    </Link>
+  </Sample>
+  <Sample time="1.000000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="9286144.000000" rateMbps="9.286144" utilPct="9.286144" />
+      <BtoA rateBps="416000.000000" rateMbps="0.416000" utilPct="0.416000" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="10123136.000000" rateMbps="10.123136" utilPct="10.123136" />
+      <BtoA rateBps="18998272.000000" rateMbps="18.998272" utilPct="18.998272" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="23380352.000000" rateMbps="23.380352" utilPct="23.380352" />
+      <BtoA rateBps="1046656.000000" rateMbps="1.046656" utilPct="1.046656" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="1705600.000000" rateMbps="1.705600" utilPct="1.705600" />
+      <BtoA rateBps="40455680.000000" rateMbps="40.455680" utilPct="40.455680" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="188032.000000" rateMbps="0.188032" utilPct="0.188032" />
+      <BtoA rateBps="4365312.000000" rateMbps="4.365312" utilPct="4.365312" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="416000.000000" rateMbps="0.416000" utilPct="0.416000" />
+      <BtoA rateBps="9286144.000000" rateMbps="9.286144" utilPct="9.286144" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="27836800.000000" rateMbps="27.836800" utilPct="27.836800" />
+      <BtoA rateBps="1342848.000000" rateMbps="1.342848" utilPct="1.342848" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="5797376.000000" rateMbps="5.797376" utilPct="5.797376" />
+      <BtoA rateBps="40583808.000000" rateMbps="40.583808" utilPct="40.583808" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="206336.000000" rateMbps="0.206336" utilPct="0.206336" />
+      <BtoA rateBps="4685184.000000" rateMbps="4.685184" utilPct="4.685184" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="393088.000000" rateMbps="0.393088" utilPct="0.393088" />
+      <BtoA rateBps="3913728.000000" rateMbps="3.913728" utilPct="3.913728" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="9617408.000000" rateMbps="9.617408" utilPct="96.174080" />
+      <BtoA rateBps="9506304.000000" rateMbps="9.506304" utilPct="95.063040" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="440960.000000" rateMbps="0.440960" utilPct="4.409600" />
+      <BtoA rateBps="10179456.000000" rateMbps="10.179456" utilPct="101.794560" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="168064.000000" rateMbps="0.168064" utilPct="1.680640" />
+      <BtoA rateBps="3932544.000000" rateMbps="3.932544" utilPct="39.325440" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="4956416.000000" rateMbps="4.956416" utilPct="49.564160" />
+      <BtoA rateBps="6656896.000000" rateMbps="6.656896" utilPct="66.568960" />
+    </Link>
+  </Sample>
+  <Sample time="1.250000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="18582272.000000" rateMbps="18.582272" utilPct="18.582272" />
+      <BtoA rateBps="835328.000000" rateMbps="0.835328" utilPct="0.835328" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="20208000.000000" rateMbps="20.208000" utilPct="20.208000" />
+      <BtoA rateBps="40073600.000000" rateMbps="40.073600" utilPct="40.073600" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="42289152.000000" rateMbps="42.289152" utilPct="42.289152" />
+      <BtoA rateBps="1873664.000000" rateMbps="1.873664" utilPct="1.873664" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="1797120.000000" rateMbps="1.797120" utilPct="1.797120" />
+      <BtoA rateBps="39562240.000000" rateMbps="39.562240" utilPct="39.562240" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="204672.000000" rateMbps="0.204672" utilPct="0.204672" />
+      <BtoA rateBps="4572288.000000" rateMbps="4.572288" utilPct="4.572288" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="835328.000000" rateMbps="0.835328" utilPct="0.835328" />
+      <BtoA rateBps="18580608.000000" rateMbps="18.580608" utilPct="18.580608" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="27863424.000000" rateMbps="27.863424" utilPct="27.863424" />
+      <BtoA rateBps="1249664.000000" rateMbps="1.249664" utilPct="1.249664" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="5339776.000000" rateMbps="5.339776" utilPct="5.339776" />
+      <BtoA rateBps="37549056.000000" rateMbps="37.549056" utilPct="37.549056" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="256256.000000" rateMbps="0.256256" utilPct="0.256256" />
+      <BtoA rateBps="6190464.000000" rateMbps="6.190464" utilPct="6.190464" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="168320.000000" rateMbps="0.168320" utilPct="0.168320" />
+      <BtoA rateBps="3687936.000000" rateMbps="3.687936" utilPct="3.687936" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="10119680.000000" rateMbps="10.119680" utilPct="101.196800" />
+      <BtoA rateBps="10242944.000000" rateMbps="10.242944" utilPct="102.429440" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="538624.000000" rateMbps="0.538624" utilPct="5.386240" />
+      <BtoA rateBps="9878400.000000" rateMbps="9.878400" utilPct="98.784000" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="178048.000000" rateMbps="0.178048" utilPct="1.780480" />
+      <BtoA rateBps="4064256.000000" rateMbps="4.064256" utilPct="40.642560" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="6569856.000000" rateMbps="6.569856" utilPct="65.698560" />
+      <BtoA rateBps="5885568.000000" rateMbps="5.885568" utilPct="58.855680" />
+    </Link>
+  </Sample>
+  <Sample time="1.500000">
+    <Link id="1" rate="100000000bps" nodeA="12" nodeB="13">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="1664.000000" rateMbps="0.001664" utilPct="0.001664" />
+    </Link>
+    <Link id="2" rate="100000000bps" nodeA="13" nodeB="14">
+      <AtoB rateBps="477568.000000" rateMbps="0.477568" utilPct="0.477568" />
+      <BtoA rateBps="7235712.000000" rateMbps="7.235712" utilPct="7.235712" />
+    </Link>
+    <Link id="3" rate="100000000bps" nodeA="13" nodeB="6">
+      <AtoB rateBps="13792768.000000" rateMbps="13.792768" utilPct="13.792768" />
+      <BtoA rateBps="667264.000000" rateMbps="0.667264" utilPct="0.667264" />
+    </Link>
+    <Link id="4" rate="100000000bps" nodeA="12" nodeB="6">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="5" rate="100000000bps" nodeA="6" nodeB="11">
+      <AtoB rateBps="449280.000000" rateMbps="0.449280" utilPct="0.449280" />
+      <BtoA rateBps="7786240.000000" rateMbps="7.786240" utilPct="7.786240" />
+    </Link>
+    <Link id="6" rate="100000000bps" nodeA="11" nodeB="10">
+      <AtoB rateBps="196352.000000" rateMbps="0.196352" utilPct="0.196352" />
+      <BtoA rateBps="4515840.000000" rateMbps="4.515840" utilPct="4.515840" />
+    </Link>
+    <Link id="7" rate="100000000bps" nodeA="10" nodeB="9">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="8" rate="100000000bps" nodeA="9" nodeB="14">
+      <AtoB rateBps="1664.000000" rateMbps="0.001664" utilPct="0.001664" />
+      <BtoA rateBps="1664.000000" rateMbps="0.001664" utilPct="0.001664" />
+    </Link>
+    <Link id="9" rate="100000000bps" nodeA="1" nodeB="5">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="10" rate="100000000bps" nodeA="1" nodeB="2">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="1664.000000" rateMbps="0.001664" utilPct="0.001664" />
+    </Link>
+    <Link id="12" rate="100000000bps" nodeA="2" nodeB="5">
+      <AtoB rateBps="4279936.000000" rateMbps="4.279936" utilPct="4.279936" />
+      <BtoA rateBps="9650944.000000" rateMbps="9.650944" utilPct="9.650944" />
+    </Link>
+    <Link id="13" rate="100000000bps" nodeA="5" nodeB="4">
+      <AtoB rateBps="303360.000000" rateMbps="0.303360" utilPct="0.303360" />
+      <BtoA rateBps="5945856.000000" rateMbps="5.945856" utilPct="5.945856" />
+    </Link>
+    <Link id="14" rate="100000000bps" nodeA="2" nodeB="3">
+      <AtoB rateBps="169728.000000" rateMbps="0.169728" utilPct="0.169728" />
+      <BtoA rateBps="3857280.000000" rateMbps="3.857280" utilPct="3.857280" />
+    </Link>
+    <Link id="15" rate="100000000bps" nodeA="4" nodeB="3">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="16" rate="100000000bps" nodeA="2" nodeB="4">
+      <AtoB rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+      <BtoA rateBps="0.000000" rateMbps="0.000000" utilPct="0.000000" />
+    </Link>
+    <Link id="17" rate="10000000bps" nodeA="6" nodeB="5">
+      <AtoB rateBps="9637760.000000" rateMbps="9.637760" utilPct="96.377600" />
+      <BtoA rateBps="10035968.000000" rateMbps="10.035968" utilPct="100.359680" />
+    </Link>
+    <Link id="18" rate="10000000bps" nodeA="9" nodeB="7">
+      <AtoB rateBps="439296.000000" rateMbps="0.439296" utilPct="4.392960" />
+      <BtoA rateBps="10028928.000000" rateMbps="10.028928" utilPct="100.289280" />
+    </Link>
+    <Link id="19" rate="10000000bps" nodeA="7" nodeB="8">
+      <AtoB rateBps="186368.000000" rateMbps="0.186368" utilPct="1.863680" />
+      <BtoA rateBps="4214784.000000" rateMbps="4.214784" utilPct="42.147840" />
+    </Link>
+    <Link id="20" rate="10000000bps" nodeA="7" nodeB="4">
+      <AtoB rateBps="6162816.000000" rateMbps="6.162816" utilPct="61.628160" />
+      <BtoA rateBps="6124544.000000" rateMbps="6.124544" utilPct="61.245440" />
+    </Link>
+  </Sample>
+</LinkUtilizationStats>
