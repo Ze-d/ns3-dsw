@@ -94,7 +94,7 @@ TypeId MySink::GetTypeId(void)
         .AddTraceSource("Utilization",
                          "Trace triggered periodically with the compute utilization (0.0 to 1.0).",
                          MakeTraceSourceAccessor(&MySink::m_utilizationTrace),
-                         "ns3::TracedCallback<double>")
+                         "ns3::TracedCallback<uint32_t, double>") // <NodeId, Utilization>
         .AddAttribute("Port",
                       "Port on which to listen for connections.",
                       UintegerValue(8080),
@@ -371,8 +371,8 @@ MySink::ReportUtilization()
     NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 算力利用率 (过去 " 
                   << m_updateInterval.GetSeconds() << "s): " << utilization * 100.0 << "%");
 
-    // 4. 触发 Trace (用于外部脚本绘图)
-    m_utilizationTrace(utilization);
+    // 4. 触发 Trace (打印xml)
+    m_utilizationTrace(GetNode()->GetId(), utilization);
 
     // 5. 重置累加器，准备下一个间隔
     m_totalTimeInInterval = Time(0);
@@ -658,4 +658,3 @@ MyProducer::SendPacket()
 }
 
 } // namespace ns3
-

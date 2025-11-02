@@ -35,6 +35,7 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE("TopoFigureFlowmonCfg");
 
 static std::ofstream g_xmlFile;
+static std::ofstream g_utilXmlFile;
 
 // ----------------------------- 配置结构 -----------------------------
 enum class NodeType
@@ -61,6 +62,7 @@ struct LinkSpec
     uint32_t id = 0;       // 标识符（可从 CSV 读取，若缺省则自动分配）
 };
 
+// ... [LoadCsvNodes 和 LoadCsvLinks 函数保持不变, 此处省略] ...
 // nodes.csv: id,x,y,name,rate
 static std::vector<NodeSpec>
 LoadCsvNodes(const std::string& path)
@@ -356,6 +358,23 @@ OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
                   << std::endl;
     }
 }
+/**
+ * @brief 当 Sink 报告算力利用率时 (Trace 回调)
+ * @param nodeId 消费者的节点 ID (用于 "Core-Id")
+ * @param utilization 利用率 (0.0 到 1.0)
+ */
+void
+OnSinkUtilization(uint32_t nodeId, double utilization)
+{
+    if (g_utilXmlFile.is_open())
+    {
+        g_utilXmlFile << "  <Event type=\"CoreUtil\""
+                  << " Time=\"" << Simulator::Now().GetSeconds() << "\""
+                  << " Core-Id=\"Core-" << nodeId << "\""
+                  << " Utilization=\"" << utilization << "\"/>"
+                  << std::endl;
+    }
+}
 
 // ----------------------------- 主程序 -----------------------------
 int
@@ -383,7 +402,8 @@ main(int argc, char* argv[])
     double simulationStepMs = 1.0;                             // 默认步长 1ms
     double proAppDuration = 0.5;                               // 默认运行 0.5s
     double proAppUpdateIntervalSec = 0.25;                      // 默认算力更新间隔 0.25s
-    std::string proSinkXmlFile = "scratch/pro_sink_stats.xml"; // 默认 XML 输出文件名
+    std::string proSinkXmlFile = "pro_sink_stats.xml"; // 默认 XML 输出文件名
+    std::string nodeUtilXmlFile = "node_util.xml"; // 默认利用率 XML 输出文件名
 
     // --- 链路监控参数 ---
     double linkUtilIntervalSec = 0.25; // 默认 0.25s 轮询
@@ -414,6 +434,7 @@ main(int argc, char* argv[])
     cmd.AddValue("proAppDuration", "Duration for Pro-Sink App (s)", proAppDuration);
     cmd.AddValue("proAppUpdateInterval", "Pro-Sink App utilization report interval (s)", proAppUpdateIntervalSec);
     cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
+    cmd.AddValue("nodeUtilXml", "Node Utilization XML output file", nodeUtilXmlFile);
 
     // --- 链路监控命令行参数 ---
     cmd.AddValue("enableLinkUtil", "Enable Link Utilization Monitor (0/1)", enableLinkUtil);
@@ -444,11 +465,16 @@ main(int argc, char* argv[])
                        BooleanValue(true));
     // --- TCP Pacing ---
 
-    // 确保 XML 输出在 scratch 目录下
+    // 确保 XML 输出在 scratch/ns3-dsw/out/ 目录下
     if (proSinkXmlFile.rfind("scratch/ns3-dsw/out/", 0) != 0)
     {
         proSinkXmlFile = "scratch/ns3-dsw/out/" + proSinkXmlFile;
     }
+    if (nodeUtilXmlFile.rfind("scratch/ns3-dsw/out/", 0) != 0)
+    {
+        nodeUtilXmlFile = "scratch/ns3-dsw/out/" + nodeUtilXmlFile;
+    }
+
 
     // 解析消费者列表
     // --- 解析 Pro-Sink 时间参数 ---
@@ -839,18 +865,35 @@ main(int argc, char* argv[])
         g_xmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
         g_xmlFile << "<ProSinkStats simulationStep=\"" << simulationStep << "\" duration=\""
                   << proAppDuration << "\">" << std::endl;
-
-        // 连接 Sink Traces
-        for (auto& sink : sinks)
-        {
-            sink->TraceConnectWithoutContext("TaskCompleted", MakeCallback(&OnSinkTaskCompleted));
-        }
-        // 连接 Producer Traces
-        for (auto& producer : producers)
-        {
-            producer->TraceConnectWithoutContext("TaskSent", MakeCallback(&OnProducerTaskSent));
-        }
     }
+
+    // --- MODIFICATION: Open new util XML file ---
+    g_utilXmlFile.open(nodeUtilXmlFile);
+    if (!g_utilXmlFile.is_open())
+    {
+        NS_LOG_ERROR("Failed to open " << nodeUtilXmlFile << " for writing.");
+    }
+    else
+    {
+        g_utilXmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
+        g_utilXmlFile << "<NodeUtilizationStats simulationStep=\"" << simulationStep << "\" duration=\""
+                        << proAppDuration << "\">" << std::endl;
+    }
+    // --- End Modification ---
+
+    // 连接 Sink Traces
+    for (auto& sink : sinks)
+    {
+        sink->TraceConnectWithoutContext("TaskCompleted", MakeCallback(&OnSinkTaskCompleted));
+        sink->TraceConnectWithoutContext("Utilization", MakeCallback(&OnSinkUtilization));
+    }
+    // 连接 Producer Traces
+    for (auto& producer : producers)
+    {
+        producer->TraceConnectWithoutContext("TaskSent", MakeCallback(&OnProducerTaskSent));
+    }
+    // --- End Modification ---
+
 
     // NetAnim：高亮 server/client
     if (enableAnim)
@@ -907,6 +950,7 @@ main(int argc, char* argv[])
 
     Simulator::Run();
 
+    // ... [FlowMonitor 统计部分保持不变, 此处省略] ...
     monitor->CheckForLostPackets();
     Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(fmh.GetClassifier());
     auto stats = monitor->GetFlowStats();
@@ -975,6 +1019,7 @@ main(int argc, char* argv[])
     monitor->SerializeToXmlFile(flowmonXml, true, true);
     NS_LOG_INFO("FlowMonitor XML written: " << flowmonXml);
 
+
     // Graphviz 可视化导出
     if (!dotPath.empty())
     {
@@ -988,6 +1033,16 @@ main(int argc, char* argv[])
         g_xmlFile.close();
         std::cout << "[stats] Pro-Sink XML written: " << proSinkXmlFile << std::endl;
     }
+
+    // --- MODIFICATION: Close new util XML file ---
+    if (g_utilXmlFile.is_open())
+    {
+        g_utilXmlFile << "</NodeUtilizationStats>" << std::endl;
+        g_utilXmlFile.close();
+        std::cout << "[stats] Node Utilization XML written: " << nodeUtilXmlFile << std::endl;
+    }
+    // --- End Modification ---
+
 
     Simulator::Destroy();
     std::cout << "\nDone.\n";

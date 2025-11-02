@@ -53,7 +53,8 @@ public:
     void Setup(double tasksPerSecond, Time simulationStep, Time updateInterval);
 
     TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
-    TracedCallback<double> m_utilizationTrace;
+    // --- MODIFICATION: Added uint32_t for NodeId ---
+    TracedCallback<uint32_t, double> m_utilizationTrace; // <NodeId, Utilization>
 
 private:
     virtual void StartApplication(void);
