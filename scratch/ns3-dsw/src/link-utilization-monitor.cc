@@ -266,12 +266,12 @@ LinkUtilizationMonitor::PollStats()
         // 4.5 写入 XML
         if (m_xmlFile.is_open())
         {
-            m_xmlFile << "    <Link id=\"" << link.linkId << "\" rate=\"" << link.rateStr
+            m_xmlFile << "    <Link id=\"" << link.linkId << "\" rateMbps=\"" << (int)capacity_Mbps
                       << "\" nodeA=\"" << link.nodeAId << "\" nodeB=\"" << link.nodeBId << "\">\n"
-                      << "      <AtoB rateBps=\"" << rateA_bps << "\" rateMbps=\"" << rateA_Mbps
-                      << "\" utilPct=\"" << utilA_pct << "\" bytes=\"" << bytesA << "\" />\n" // 增加 bytes
-                      << "      <BtoA rateBps=\"" << rateB_bps << "\" rateMbps=\"" << rateB_Mbps
-                      << "\" utilPct=\"" << utilB_pct << "\" bytes=\"" << bytesB << "\" />\n" // 增加 bytes
+                      << "      <AtoB rateMbps=\"" << rateA_Mbps
+                      << "\" utilPct=\"" << utilA_pct << "\" />\n"
+                      << "      <BtoA rateMbps=\"" << rateB_Mbps
+                      << "\" utilPct=\"" << utilB_pct << "\" />\n"
                       << "    </Link>\n";
         }
     }

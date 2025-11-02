@@ -406,7 +406,7 @@ main(int argc, char* argv[])
 
     // --- 链路监控参数 ---
     double linkUtilIntervalSec = 0.25; // 默认 0.25s 轮询
-    std::string linkUtilXmlFile = "scratch/ns3-dsw/out/link_util.xml"; // 默认 XML
+    std::string linkUtilXmlFile = "link_util.xml"; // 默认 XML
     bool enableLinkUtil = true; // 默认启用
 
     CommandLine cmd;
