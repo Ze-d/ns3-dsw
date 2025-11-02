@@ -10,10 +10,14 @@
 #include "ns3/traffic-control-layer.h" // 包含 TrafficControlLayer
 #include "ns3/core-module.h" // 包含 Ptr
 
+#include "ns3/queue-item.h"
+
+
 #include <string>
-#include <vector>
+#include <list>     // [修改] 使用 list 保证指针稳定性
 #include <fstream>
-#include <iomanip> // 用于 std::setw 等
+#include <iomanip>  // 用于 std::setw 等
+#include <atomic>   // [修改] 用于回调安全累加
 
 namespace ns3 {
 
@@ -21,10 +25,9 @@ namespace ns3 {
  * \ingroup traffic-control
  * \brief A monitor to poll QueueDisc statistics and report link utilization.
  *
- * This class polls the root QueueDisc statistics for registered P2P links
- * at a fixed interval. It calculates the bidirectional data rate (Mbps) and
- * utilization (%), printing a report to the console and logging
- * time-series data to an XML file.
+ * This class uses callbacks on the QueueDisc's "Dequeue" trace to
+ * accumulate transmitted bytes, and a periodic poller (PollStats)
+ * to report the utilization based on the *actual* elapsed time.
  */
 class LinkUtilizationMonitor : public Object
 {
@@ -96,8 +99,10 @@ class LinkUtilizationMonitor : public Object
         std::string rateStr;  //!< Cached string representation of rate
         Ptr<QueueDisc> qd_A_to_B; //!< QueueDisc on Node A (sends to B)
         Ptr<QueueDisc> qd_B_to_A; //!< QueueDisc on Node B (sends to A)
-        uint64_t prevTxBytes_A_to_B; //!< Previous Tx bytes (A->B)
-        uint64_t prevTxBytes_B_to_A; //!< Previous Tx bytes (B->A)
+
+        // [修改] 使用 atomic 累加器，由回调函数写入，由 PollStats 读取
+        std::atomic<uint64_t> intervalBytes_A_to_B; //!< Bytes dequeued (A->B) since last poll
+        std::atomic<uint64_t> intervalBytes_B_to_A; //!< Bytes dequeued (B->A) since last poll
     };
 
     /**
@@ -122,12 +127,21 @@ class LinkUtilizationMonitor : public Object
      */
     Ptr<TrafficControlLayer> GetTcLayer(Ptr<NetDevice> dev);
 
-    std::vector<LinkRecord> m_links; //!< List of all monitored links
+    /**
+     * [新增] 静态回调函数，用于 QueueDisc 的 "Dequeue" 跟踪。
+     * @param rec 指向要更新的 LinkRecord 的指针。
+     * @param isAtoB 标识方向 (true A->B, false B->A)。
+     * @param packet 出队的数据包。
+     */
+    static void StaticOnDequeue(LinkRecord* rec, bool isAtoB, Ptr<const QueueDiscItem> item);
+
+    std::list<LinkRecord> m_links;   //!< [修改] 监控链路列表 (使用 list)
     Time m_interval;                 //!< Polling interval
     bool m_running;                  //!< Flag to control the polling loop
     bool m_xmlHeaderWritten;         //!< Flag to ensure footer is only written if header was
     std::ofstream m_xmlFile;         //!< Output file stream for XML
     std::string m_xmlFilePath;       //!< Path to the XML file
+    Time m_lastPollTime;             //!< [新增] 上次轮询的精确时间
 };
 
 } // namespace ns3
