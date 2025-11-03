@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NodeUtilizationStats simulationStep="+1e+06ns" duration="1.25">
+  <Event type="CoreUtil" Time="0.1" Core-Id="Core-2" Utilization="0.10101"/>
+  <Event type="CoreUtil" Time="0.1" Core-Id="Core-6" Utilization="0.030303"/>
+  <Event type="CoreUtil" Time="0.1" Core-Id="Core-9" Utilization="0.0707071"/>
+  <Event type="CoreUtil" Time="0.2" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.2" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.2" Core-Id="Core-9" Utilization="0.27"/>
+  <Event type="CoreUtil" Time="0.3" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.3" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.3" Core-Id="Core-9" Utilization="0.34"/>
+  <Event type="CoreUtil" Time="0.4" Core-Id="Core-2" Utilization="0.99"/>
+  <Event type="CoreUtil" Time="0.4" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.4" Core-Id="Core-9" Utilization="0.34"/>
+  <Event type="CoreUtil" Time="0.5" Core-Id="Core-2" Utilization="0.68"/>
+  <Event type="CoreUtil" Time="0.5" Core-Id="Core-6" Utilization="0.28"/>
+  <Event type="CoreUtil" Time="0.5" Core-Id="Core-9" Utilization="0.67"/>
+  <Event type="CoreUtil" Time="0.6" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.6" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.6" Core-Id="Core-9" Utilization="0.34"/>
+  <Event type="CoreUtil" Time="0.7" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.7" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.7" Core-Id="Core-9" Utilization="0.34"/>
+  <Event type="CoreUtil" Time="0.8" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.8" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.8" Core-Id="Core-9" Utilization="0"/>
+  <Event type="CoreUtil" Time="0.9" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.9" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="0.9" Core-Id="Core-9" Utilization="0"/>
+  <Event type="CoreUtil" Time="1" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="1" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="1" Core-Id="Core-9" Utilization="0.66"/>
+  <Event type="CoreUtil" Time="1.1" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="1.1" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="1.1" Core-Id="Core-9" Utilization="0.35"/>
+  <Event type="CoreUtil" Time="1.2" Core-Id="Core-2" Utilization="1"/>
+  <Event type="CoreUtil" Time="1.2" Core-Id="Core-6" Utilization="1"/>
+  <Event type="CoreUtil" Time="1.2" Core-Id="Core-9" Utilization="0.34"/>
+</NodeUtilizationStats>

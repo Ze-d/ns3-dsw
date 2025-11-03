@@ -1,12 +1,9 @@
 /*
 pro-sink-app/example/pro-sink-example.cc
-一个简单的p2p拓扑，装载了消费者和生产者应用
+一个简单的p2p拓扑，装载了消费者和生产者应用 (已更新为 TCP Pacing)
 
 to run:
-./ns3 run pro-sink-app-example
-
-如果运行不了
-./ns3 configure --enable-example
+./ns3 run pro-sink-app-example -- --consumerRatePerSecond=20 --lambda=25
 */
 
 
@@ -17,7 +14,8 @@ to run:
 #include "ns3/applications-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
 
-#include "ns3/drop-tail-queue.h"
+// 包含流量控制模块
+#include "ns3/traffic-control-module.h"
 
 // 包含新建模块
 #include "ns3/pro-sink-app-module.h"
@@ -37,7 +35,6 @@ NS_LOG_COMPONENT_DEFINE("P2PTaskSimulationExample");
 void
 TaskSentCallback(uint32_t nodeId, uint32_t taskId, Address targetAddress)
 {
-    // [修改] 将 Trace 日志的任务ID格式修改为 "nodeId-taskId"
     NS_LOG_UNCOND(Simulator::Now().GetSeconds()
                   << "s: [TRACE] Producer Node " << nodeId << ": Task " << nodeId << "-" << taskId
                   << " sent to " << InetSocketAddress::ConvertFrom(targetAddress).GetIpv4());
@@ -53,11 +50,22 @@ TaskSentCallback(uint32_t nodeId, uint32_t taskId, Address targetAddress)
 void
 TaskCompletedCallback(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uint32_t totalCompleted)
 {
-    // [修改] 更新此函数以匹配新的 TraceSource 签名
-    // 现在我们可以打印 "producerId-taskId" 格式了
     NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [TRACE] Sink Node " << nodeId
                                                << ": Task " << producerId << "-" << taskId << " completed. Total: "
                                                << totalCompleted);
+}
+
+/**
+ * @brief (新增) 消费者 "Utilization" Trace 的回调函数
+ * @param utilization 算力利用率 (0.0 to 1.0)
+ */
+void
+UtilizationCallback(double utilization)
+{
+    // MySink 内部已经用 NS_LOG_UNCOND 打印了利用率。
+    // 这个 Trace 主要用于脚本进行二次处理，例如写入 Gnuplot 文件。
+    // 我们在这里用 LOG_INFO 打印，以演示 Trace 已连接成功。
+    //NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [TRACE] Sink Node Utilization: " << utilization * 100.0 << "%");
 }
 
 
@@ -66,21 +74,39 @@ main(int argc, char* argv[])
 {
     // --- 参数定义 ---
     double lambda = 25.0; // 平均每秒生成任务数
-    double simulationTime = 1.0;
+    double simulationTime = 1.0; // 默认模拟 1 秒
     double simulationStepMs = 1.0; // tick长度
     double consumerRatePerSecond = 20.0; // 每秒消纳任务数
+    double updateIntervalSec = 0.25; // (新增) 算力利用率报告间隔，默认 1 秒
 
     CommandLine cmd(__FILE__);
     cmd.AddValue("lambda", "生产者平均每秒生成的任务数", lambda);
     cmd.AddValue("simulationTime", "模拟总时长 (秒)", simulationTime);
     cmd.AddValue("step", "模拟步长 (毫秒)", simulationStepMs);
     cmd.AddValue("consumerRatePerSecond", "消费者每秒处理的任务数", consumerRatePerSecond);
+    cmd.AddValue("updateInterval", "算力利用率报告间隔 (秒)", updateIntervalSec); // (新增)
     cmd.Parse(argc, argv);
 
     Time::SetResolution(Time::NS);
     LogComponentEnable("P2PTaskSimulationExample", LOG_LEVEL_INFO);
-    // [重要] 确保 ProSinkApp 的日志级别为 INFO 或更低，以查看 NS_LOG_UNCOND
-    LogComponentEnable("ProSinkApp", LOG_LEVEL_INFO); 
+    
+    // (ProSinkApp 的日志由 MySink 内部的 NS_LOG_UNCOND 控制，无需在此启用)
+    // LogComponentEnable("ProSinkApp", LOG_LEVEL_INFO); 
+
+    // --- TCP Pacing 关键配置 ---
+    
+    // 设置默认的 TCP 拥塞控制算法 (Cubic)
+    Config::SetDefault("ns3::TcpL4Protocol::SocketType", 
+                       TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
+
+    // 1. 启用 Pacing
+    Config::SetDefault("ns3::TcpSocketState::EnablePacing", 
+                       BooleanValue(true));
+
+    // 2. (可选) 启用初始窗口的 Pacing
+    Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", 
+                       BooleanValue(true));
+
 
     // --- 网络拓扑设置 ---
     NodeContainer producerNodes, consumerNodes;
@@ -91,56 +117,62 @@ main(int argc, char* argv[])
     pointToPoint.SetDeviceAttribute("DataRate", StringValue("100Mbps"));
     pointToPoint.SetChannelAttribute("Delay", StringValue("2ms"));
 
-    // 手动创建一个 DropTailQueue，设置其属性
-    Ptr<DropTailQueue<Packet>> q = CreateObject<DropTailQueue<Packet>>();
-
-    q->SetAttribute("MaxSize", QueueSizeValue(QueueSize("4000p")));
-
-    pointToPoint.SetDeviceAttribute("TxQueue", PointerValue(q));
-
     // 连接 Node 0 和 Node 1
     NetDeviceContainer p2pDevices;
     p2pDevices.Add(pointToPoint.Install(producerNodes.Get(0), consumerNodes.Get(0)));
-    // 生产者总共发送 50 个任务 * 256 包/任务 = 12800 包。
 
     InternetStackHelper stack;
     stack.Install(producerNodes);
     stack.Install(consumerNodes);
 
+    // --- 安装 FqCoDel 队列以支持 Pacing ---
+    TrafficControlHelper tch;
+    tch.SetRootQueueDisc("ns3::FqCoDelQueueDisc");
+    tch.Install(p2pDevices);
+
+
     Ipv4AddressHelper address;
     address.SetBase("10.1.1.0", "255.255.255.0");
-    // p2pDevices.Get(0) 是生产者 (10.1.1.1)
-    // p2pDevices.Get(1) 是消费者 (10.1.1.2)
     Ipv4InterfaceContainer interfaces = address.Assign(p2pDevices);
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
     // --- 应用层设置 ---
     Time simStep = MilliSeconds(simulationStepMs);
+    Time updateInterval = Seconds(updateIntervalSec); // (新增)
     uint16_t port = 8080;
+    uint32_t taskSize = 256 * 1024;
+    uint32_t packetSize = 1024; // 必须与 MyProducer/MySink 中的 m_packetSize 匹配
 
     // 1. 配置并安装消费者应用 (MySink)
     Ptr<MySink> sinkApp = CreateObject<MySink>();
-    sinkApp->Setup(consumerRatePerSecond, simStep);
+    
+    // (修改) Setup 函数现在需要 3 个参数
+    sinkApp->Setup(consumerRatePerSecond, simStep, updateInterval); 
+    
+    // 通过 Attribute 设置 TaskSize 和 PacketSize
+    sinkApp->SetAttribute("TaskSize", UintegerValue(taskSize));
+    sinkApp->SetAttribute("PacketSize", UintegerValue(packetSize));
     consumerNodes.Get(0)->AddApplication(sinkApp); // 安装在 Node 1
     sinkApp->SetStartTime(Seconds(0.0));
-    sinkApp->SetStopTime(Seconds(simulationTime));
+    sinkApp->SetStopTime(Seconds(simulationTime + 0.3));
 
     // 2. 配置并安装生产者应用 (MyProducer)
     Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
-    std::vector<Address> sinkAddresses;
-    // 目标地址是 Node 1 (消费者) 的 IP
-    sinkAddresses.push_back(InetSocketAddress(interfaces.GetAddress(1), port));
-    producerApp->Setup(sinkAddresses, lambda, 256 * 1024, 1024, simStep);
+    
+    // MyProducer::Setup 现在接受单个 Address
+    Address sinkAddress(InetSocketAddress(interfaces.GetAddress(1), port));
+    
+    producerApp->Setup(sinkAddress, lambda, taskSize, packetSize, simStep);
+    // 通过 Attribute 设置 TaskSize 和 PacketSize
+    producerApp->SetAttribute("TaskSize", UintegerValue(taskSize));
+    producerApp->SetAttribute("PacketSize", UintegerValue(packetSize));
     producerNodes.Get(0)->AddApplication(producerApp); // 安装在 Node 0
     producerApp->SetStartTime(Seconds(0.1));
     producerApp->SetStopTime(Seconds(simulationTime));
 
-    // --- 3. 连接 Trace Source  ---
-    // [修改] 取消注释以激活 Trace
-    // 将 "TaskCompleted" Trace 连接到我们的回调函数
+    // --- 3. 连接 Trace Source ---
     sinkApp->TraceConnectWithoutContext("TaskCompleted", MakeCallback(&TaskCompletedCallback));
-    
-    // 将 "TaskSent" Trace 连接到我们的回调函数
+    sinkApp->TraceConnectWithoutContext("Utilization", MakeCallback(&UtilizationCallback)); // (新增)
     producerApp->TraceConnectWithoutContext("TaskSent", MakeCallback(&TaskSentCallback));
 
     // --- 运行仿真 ---
