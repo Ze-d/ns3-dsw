@@ -8,16 +8,17 @@
 #include "ns3/random-variable-stream.h"
 #include "ns3/traced-callback.h"
 #include "ns3/header.h" // 包含 Header
+#include "ns3/buffer.h" // 包含 Buffer
 
 #include <queue>
 #include <vector>
 #include <map>     // 包含 map
+#include <list>    // 包含 list
 #include <utility> // 包含 pair
 
 namespace ns3 {
 
 // --- 0. 自定义包头 (TaskHeader) 声明 ---
-// 用于在生产者和消费者之间传递任务标识
 class TaskHeader : public Header
 {
 public:
@@ -41,7 +42,7 @@ private:
 };
 
 
-// --- 1. 自定义消费者应用 (MySink) 声明 ---
+// --- 1. 自定义消费者应用 (MySink) 声明 (TCP 版本) ---
 class MySink : public Application
 {
 public:
@@ -49,38 +50,61 @@ public:
     MySink();
     virtual ~MySink();
 
-    void Setup(double tasksPerSecond, Time simulationStep);
+    void Setup(double tasksPerSecond, Time simulationStep, Time updateInterval);
 
-    // TracedCallback: nodeId, producerId, taskId, totalCompleted
-    // 当一个任务处理完成时触发
     TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
+    // --- MODIFICATION: Added uint32_t for NodeId ---
+    TracedCallback<uint32_t, double> m_utilizationTrace; // <NodeId, Utilization>
 
 private:
     virtual void StartApplication(void);
     virtual void StopApplication(void);
 
+    // --- TCP 监听和连接管理 ---
+    bool HandleAccept(Ptr<Socket> socket, const Address& from);
+    void HandleNewConnection(Ptr<Socket> socket, const Address& from);
+    void CleanupConnection(Ptr<Socket> socket);
+    
+    // --- TCP 回调 ---
     void HandleRead(Ptr<Socket> socket);
-    void ProcessTasks();
+    void HandleNormalClose(Ptr<Socket> socket);
+    void HandleErrorClose(Ptr<Socket> socket);
+    
+    // --- TCP 流处理 ---
+    void ProcessSocketBuffer(Ptr<Socket> socket);
 
-    Ptr<Socket> m_socket;
+    // --- 任务处理 ---
+    void ProcessTasks();
+    // --- 算力统计 ---
+    void ReportUtilization();
+
+    Ptr<Socket> m_listenSocket; // TCP 监听套接字
+    std::list<Ptr<Socket>> m_acceptedSockets; // 跟踪所有活跃连接
+    
+    std::map<Ptr<Socket>, Buffer> m_socketBuffers;
+
     uint16_t    m_port;
     uint32_t    m_taskSize;
+    uint32_t    m_packetSize; // 用于解析流
 
-    // 按 (producerId, taskId) 跟踪接收字节数
     std::map<std::pair<uint32_t, uint32_t>, uint32_t> m_currentRxBytesPerTask;
 
     Time        m_simulationStep;
     uint32_t    m_tasksCompleted;
-    // 队列存储 (producerId, taskId)
     std::queue<std::pair<uint32_t, uint32_t>> m_taskQueue;
 
     double      m_tasksPerSecond;
     double      m_processingCredit;
     bool        m_running;
+
+    // --- 算力统计成员 ---
+    Time        m_updateInterval;       // 报告利用率的间隔
+    Time        m_totalTimeInInterval;  // 间隔内的总时间累加器
+    Time        m_idleTimeInInterval;   // 间隔内的空闲时间累加器
 };
 
 
-// --- 2. 自定义生产者应用 (MyProducer) 声明 ---
+// --- 2. 自定义生产者应用 (MyProducer) ---
 class MyProducer : public Application
 {
 public:
@@ -88,30 +112,35 @@ public:
     MyProducer();
     virtual ~MyProducer();
 
-    void Setup(const std::vector<Address>& sinkAddresses, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
+    void Setup(Address sinkAddress, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
 
-    // TracedCallback: nodeId, taskId (totalSent), targetAddress
-    // 当一个新任务开始发送时触发
     TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
 
 private:
     virtual void StartApplication(void);
     virtual void StopApplication(void);
 
+    // --- TCP 回调 ---
+    void ConnectionSucceeded(Ptr<Socket> socket);
+    void ConnectionFailed(Ptr<Socket> socket);
+    void HandleSend(Ptr<Socket> socket, uint32_t txSpace); // 流量控制
+    void NormalClose(Ptr<Socket> socket);
+    void ErrorClose(Ptr<Socket> socket);
+
+    // --- 发送和生成逻辑 ---
     void SendPacket();
     void SendNextTask();
     void GenerateTasks();
 
     Ptr<Socket> m_socket;
-    std::vector<Address> m_sinkAddresses;
-    Address     m_currentTarget;
+    Address     m_peerAddress; // 单个对端
+    
     uint32_t    m_taskSize;
     uint32_t    m_packetSize;
-    uint32_t    m_packetsSentForCurrentTask;
+    uint64_t    m_totalBytesSentForCurrentTask; // 使用字节数跟踪 TCP 流
     uint32_t    m_totalTasksSent;
     bool        m_isSending;
 
-    // 用于添加到包头的当前任务信息
     uint32_t    m_currentSendingProducerId;
     uint32_t    m_currentSendingTaskId;
 
@@ -119,8 +148,9 @@ private:
     double m_lambda;
     Ptr<ExponentialRandomVariable> m_interTaskTimeGenerator;
     std::queue<bool> m_taskQueue;
-    Ptr<UniformRandomVariable> m_sinkSelector;
+    
     bool m_running;
+    bool m_connected;
 };
 
 } // namespace ns3
