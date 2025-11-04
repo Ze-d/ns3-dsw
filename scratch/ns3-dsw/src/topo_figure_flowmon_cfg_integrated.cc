@@ -8,6 +8,7 @@
 #include "ns3/flow-monitor-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
+#include "ns3/ipv4-routing-helper.h" // <== 为打印路由表所需
 #include "ns3/log.h"
 #include "ns3/mobility-module.h"
 #include "ns3/names.h"
@@ -15,7 +16,7 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/pro-sink-app.h"
-#include "ns3/string.h" // 用于 StringValue
+#include "ns3/string.h"                 // 用于 StringValue
 #include "ns3/traffic-control-module.h" //Pacing
 
 #include <algorithm>
@@ -253,7 +254,7 @@ SetupLogging(const std::string& levelStr)
     if (s == "all")
         lv = LOG_LEVEL_ALL;
     LogComponentEnable("TopoFigureFlowmonCfg", lv);
-    LogComponentEnable("ProSinkApp", lv); // 启用新 App 的日志
+    LogComponentEnable("ProSinkApp", lv);             // 启用新 App 的日志
     LogComponentEnable("LinkUtilizationMonitor", lv); // 启用链路监控日志
     NS_LOG_INFO("Logging level set to: " << s);
 }
@@ -332,11 +333,9 @@ OnSinkTaskCompleted(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uint3
                   << " Core-Id=\"Core-" << nodeId << "\""
                   << " Edge-Id=\"Edge-" << producerId << "\""
                   << " Task-Id=\"" << producerId << "-" << taskId << "\""
-                  << " TotalCompleted=\"" << totalCompleted << "\"/>"
-                  << std::endl;
+                  << " TotalCompleted=\"" << totalCompleted << "\"/>" << std::endl;
     }
 }
-
 
 /**
  * @brief 当 Producer 发送一个新任务时（Trace 回调）
@@ -357,6 +356,7 @@ OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
                   << std::endl;
     }
 }
+
 /**
  * @brief 当 Sink 报告算力利用率时 (Trace 回调)
  * @param nodeId 消费者的节点 ID (用于 "Core-Id")
@@ -368,10 +368,9 @@ OnSinkUtilization(uint32_t nodeId, double utilization)
     if (g_utilXmlFile.is_open())
     {
         g_utilXmlFile << "  <Event type=\"CoreUtil\""
-                  << " Time=\"" << Simulator::Now().GetSeconds() << "\""
-                  << " Core-Id=\"Core-" << nodeId << "\""
-                  << " Utilization=\"" << utilization << "\"/>"
-                  << std::endl;
+                      << " Time=\"" << Simulator::Now().GetSeconds() << "\""
+                      << " Core-Id=\"Core-" << nodeId << "\""
+                      << " Utilization=\"" << utilization << "\"/>" << std::endl;
     }
 }
 
@@ -385,8 +384,8 @@ main(int argc, char* argv[])
     std::string flowmonXml = "topo-figure.perlink.flowmon.xml";
     std::string statsCsv = ""; // 若非空则导出 CSV 指标
     std::string animXml = "topo-figure.xml";
-    std::string dotPath = ""; // 若非空导出 .dot
-    double dotScale = 80.0;   // dot 坐标缩放
+    std::string dotPath = "";     // 若非空导出 .dot
+    double dotScale = 80.0;       // dot 坐标缩放
     double proAppStartTime = 0.0; // Pro-Sink App 的启动时间 (s)
     bool enablePcap = false;
     bool enableAnim = true;
@@ -398,16 +397,21 @@ main(int argc, char* argv[])
     double delayFactor = 1.0;      // 额外缩放系数
 
     // --- Pro-Sink App 参数 ---
-    double simulationStepMs = 1.0;                             // 默认步长 1ms
-    double proAppDuration = 0.5;                               // 默认运行 0.5s
-    double proAppUpdateIntervalSec = 0.25;                      // 默认算力更新间隔 0.25s
+    double simulationStepMs = 1.0;                     // 默认步长 1ms
+    double proAppDuration = 0.5;                       // 默认运行 0.5s
+    double proAppUpdateIntervalSec = 0.25;             // 默认算力更新间隔 0.25s
     std::string proSinkXmlFile = "pro_sink_stats.xml"; // 默认 XML 输出文件名
-    std::string nodeUtilXmlFile = "node_util.xml"; // 默认利用率 XML 输出文件名
+    std::string nodeUtilXmlFile = "node_util.xml";     // 默认利用率 XML 输出文件名
 
     // --- 链路监控参数 ---
-    double linkUtilIntervalSec = 0.25; // 默认 0.25s 轮询
+    double linkUtilIntervalSec = 0.25;             // 默认 0.25s 轮询
     std::string linkUtilXmlFile = "link_util.xml"; // 默认 XML
-    bool enableLinkUtil = true; // 默认启用
+    bool enableLinkUtil = true;                    // 默认启用
+    // router
+    // --- 启用 IPv4 全局路由的 ECMP（逐包随机）---
+    Config::SetDefault("ns3::Ipv4GlobalRouting::RandomEcmpRouting", BooleanValue(true));
+    // 可选：若你会在仿真中上下线接口，希望全局路由自动重算：
+    Config::SetDefault("ns3::Ipv4GlobalRouting::RespondToInterfaceEvents", BooleanValue(true));
 
     CommandLine cmd;
     cmd.AddValue("nodes", "CSV of nodes: id[,x,y[,name]]", nodesCsv);
@@ -431,13 +435,17 @@ main(int argc, char* argv[])
     // --- Pro-Sink App 命令行参数 ---
     cmd.AddValue("simulationStep", "Simulation step for Pro-Sink App (ms)", simulationStepMs);
     cmd.AddValue("proAppDuration", "Duration for Pro-Sink App (s)", proAppDuration);
-    cmd.AddValue("proAppUpdateInterval", "Pro-Sink App utilization report interval (s)", proAppUpdateIntervalSec);
+    cmd.AddValue("proAppUpdateInterval",
+                 "Pro-Sink App utilization report interval (s)",
+                 proAppUpdateIntervalSec);
     cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
     cmd.AddValue("nodeUtilXml", "Node Utilization XML output file", nodeUtilXmlFile);
 
     // --- 链路监控命令行参数 ---
     cmd.AddValue("enableLinkUtil", "Enable Link Utilization Monitor (0/1)", enableLinkUtil);
-    cmd.AddValue("linkUtilInterval", "Link Utilization Monitor poll interval (s)", linkUtilIntervalSec);
+    cmd.AddValue("linkUtilInterval",
+                 "Link Utilization Monitor poll interval (s)",
+                 linkUtilIntervalSec);
     cmd.AddValue("linkUtilXml", "Link Utilization Monitor XML output file", linkUtilXmlFile);
 
     cmd.Parse(argc, argv);
@@ -450,18 +458,16 @@ main(int argc, char* argv[])
         linkMonitor = CreateObject<LinkUtilizationMonitor>();
         linkMonitor->SetPollInterval(Seconds(linkUtilIntervalSec));
         linkMonitor->SetXmlOutput(linkUtilXmlFile);
-        NS_LOG_INFO("Link Utilization Monitor enabled. Interval=" << linkUtilIntervalSec
-                                                                 << "s, Output=" << linkUtilXmlFile);
+        NS_LOG_INFO("Link Utilization Monitor enabled. Interval="
+                    << linkUtilIntervalSec << "s, Output=" << linkUtilXmlFile);
     }
 
     // --- TCP Pacing 关键配置 (从 example 复制) ---
     NS_LOG_INFO("Enabling TCP Cubic and Pacing...");
-    Config::SetDefault("ns3::TcpL4Protocol::SocketType", 
+    Config::SetDefault("ns3::TcpL4Protocol::SocketType",
                        TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
-    Config::SetDefault("ns3::TcpSocketState::EnablePacing", 
-                       BooleanValue(true));
-    Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", 
-                       BooleanValue(true));
+    Config::SetDefault("ns3::TcpSocketState::EnablePacing", BooleanValue(true));
+    Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", BooleanValue(true));
     // --- TCP Pacing ---
 
     // 确保 XML 输出在 scratch/ns3-dsw/out/ 目录下
@@ -473,7 +479,6 @@ main(int argc, char* argv[])
     {
         nodeUtilXmlFile = "scratch/ns3-dsw/out/" + nodeUtilXmlFile;
     }
-
 
     // 解析消费者列表
     // --- 解析 Pro-Sink 时间参数 ---
@@ -621,11 +626,11 @@ main(int argc, char* argv[])
             // delay CSV column removed — use a sensible default when not computing by distance
             p2p.SetChannelAttribute("Delay", TimeValue(MilliSeconds(1)));
         }
-        
+
         // 原始方向：a 在前、b 在后 -> IP 地址 index 0 属于 a，index 1 属于 b
         NetDeviceContainer dev = p2p.Install(nodes.Get(l.a), nodes.Get(l.b));
         allP2pDevices.Add(dev); // 将设备添加到容器
-        
+
         Ipv4InterfaceContainer ifc = address.Assign(dev);
         address.NewNetwork();
 
@@ -690,12 +695,13 @@ main(int argc, char* argv[])
             // rec.a 和 rec.b 是原始的 linkSpec.a 和 linkSpec.b
             // rec.ifc.Get(0) 对应 rec.a 上的设备
             // rec.ifc.Get(1) 对应 rec.b 上的设备
-            linkMonitor->RegisterLink(rec.id,       // linkId
-                                      rec.a,        // nodeAId
-                                      rec.b,        // nodeBId
-                                      rec.ifc.Get(0).first->GetNetDevice(rec.ifc.Get(0).second), // devA
-                                      rec.ifc.Get(1).first->GetNetDevice(rec.ifc.Get(1).second), // devB
-                                      DataRate(rec.rate)); // rate
+            linkMonitor->RegisterLink(
+                rec.id,                                                    // linkId
+                rec.a,                                                     // nodeAId
+                rec.b,                                                     // nodeBId
+                rec.ifc.Get(0).first->GetNetDevice(rec.ifc.Get(0).second), // devA
+                rec.ifc.Get(1).first->GetNetDevice(rec.ifc.Get(1).second), // devB
+                DataRate(rec.rate));                                       // rate
         }
     }
 
@@ -709,7 +715,8 @@ main(int argc, char* argv[])
     std::map<uint32_t, Ipv4Address> nodeIpMap;
     for (uint32_t nodeId : nodeIds)
     {
-        if (nodeId == 0) continue; 
+        if (nodeId == 0)
+            continue;
 
         Ptr<Ipv4> ipv4 = nodes.Get(nodeId)->GetObject<Ipv4>();
         if (ipv4->GetNInterfaces() <= 1)
@@ -757,6 +764,16 @@ main(int argc, char* argv[])
     // 路由
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
     NS_LOG_INFO("Global routes populated.");
+    // --- 导出所有节点的 IPv4 路由表到文件 ---
+    // 目录沿用你现有的 out/ 输出目录
+    auto routingStream =
+        Create<OutputStreamWrapper>("scratch/ns3-dsw/out/routing-ecmp.txt", std::ios::out);
+
+    // 在 t=0.0s 时刻打印一次（也可改为 proAppStartTime 或任意时间点）
+    Ipv4RoutingHelper::PrintRoutingTableAllAt(Seconds(0.0), routingStream);
+
+    // 如果想周期性保存（例如每 0.5s 一次），改用：
+    // Ipv4RoutingHelper::PrintRoutingTableAllEvery(Seconds(0.5), routingStream);
 
     // --- 用于轮询分配消费者的索引 ---
     uint32_t sinkRoundRobinIndex = 0;
@@ -814,9 +831,9 @@ main(int argc, char* argv[])
             }
             Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
 
-        // 使用轮询 (Round-Robin) 方式将生产者分配给消费者
-            Address targetSink = sinkAddresses[sinkRoundRobinIndex]; 
-            
+            // 使用轮询 (Round-Robin) 方式将生产者分配给消费者
+            Address targetSink = sinkAddresses[sinkRoundRobinIndex];
+
             // 更新索引，使其在 sinkAddresses 列表的大小上循环
             sinkRoundRobinIndex = (sinkRoundRobinIndex + 1) % sinkAddresses.size();
 
@@ -824,8 +841,8 @@ main(int argc, char* argv[])
                                ns.appRate,
                                proTaskSize,
                                proPacketSize,
-                               simulationStep); 
-            
+                               simulationStep);
+
             // 同样设置 Attribute (与 example 保持一致)
             producerApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             producerApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));
@@ -838,7 +855,7 @@ main(int argc, char* argv[])
         }
         // (ns.type == UNKNOWN 的节点会被自动跳过)
     }
-    
+
     if (!sinkAddresses.empty())
     {
         NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
@@ -846,7 +863,7 @@ main(int argc, char* argv[])
     }
     else
     {
-         NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
+        NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
                                  << " producers.");
     }
 
@@ -874,8 +891,8 @@ main(int argc, char* argv[])
     else
     {
         g_utilXmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
-        g_utilXmlFile << "<NodeUtilizationStats simulationStep=\"" << simulationStep << "\" duration=\""
-                        << proAppDuration << "\">" << std::endl;
+        g_utilXmlFile << "<NodeUtilizationStats simulationStep=\"" << simulationStep
+                      << "\" duration=\"" << proAppDuration << "\">" << std::endl;
     }
 
     // 连接 Sink Traces
@@ -904,17 +921,17 @@ main(int argc, char* argv[])
             else
                 label << id << ":" << nm;
             anim.UpdateNodeDescription(n, label.str());
-            
+
             // 根据新类型为节点着色
             if (nodeSpecMap.count(id))
             {
-                if(nodeSpecMap.at(id).type == NodeType::PRODUCER)
+                if (nodeSpecMap.at(id).type == NodeType::PRODUCER)
                 {
                     anim.UpdateNodeColor(n, 255, 0, 0); // 红色 (Producer)
                 }
                 else if (nodeSpecMap.at(id).type == NodeType::CONSUMER)
                 {
-                     anim.UpdateNodeColor(n, 0, 0, 255); // 蓝色 (Consumer)
+                    anim.UpdateNodeColor(n, 0, 0, 255); // 蓝色 (Consumer)
                 }
                 else
                 {
@@ -1012,7 +1029,6 @@ main(int argc, char* argv[])
 
     monitor->SerializeToXmlFile(flowmonXml, true, true);
     NS_LOG_INFO("FlowMonitor XML written: " << flowmonXml);
-
 
     // Graphviz 可视化导出
     if (!dotPath.empty())
