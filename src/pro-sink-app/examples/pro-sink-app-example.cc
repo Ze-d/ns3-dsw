@@ -60,7 +60,7 @@ TaskCompletedCallback(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uin
  * @param utilization 算力利用率 (0.0 to 1.0)
  */
 void
-UtilizationCallback(double utilization)
+UtilizationCallback(uint32_t nodeId, double utilization)
 {
     // MySink 内部已经用 NS_LOG_UNCOND 打印了利用率。
     // 这个 Trace 主要用于脚本进行二次处理，例如写入 Gnuplot 文件。
