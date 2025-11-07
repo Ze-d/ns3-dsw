@@ -147,7 +147,7 @@ main(int argc, char* argv[])
     Ptr<MySink> sinkApp = CreateObject<MySink>();
     
     // (修改) Setup 函数现在需要 3 个参数
-    sinkApp->Setup(consumerRatePerSecond, simStep, updateInterval); 
+    sinkApp->Setup(consumerNodes.Get(0)->GetId(), consumerRatePerSecond, simStep, updateInterval);
     
     // 通过 Attribute 设置 TaskSize 和 PacketSize
     sinkApp->SetAttribute("TaskSize", UintegerValue(taskSize));
