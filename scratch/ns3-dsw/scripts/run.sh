@@ -4,7 +4,8 @@
 ./ns3 run "topo_figure_flowmon_cfg_integrated \
 --nodes=scratch/ns3-dsw/data/nodes.csv \
 --links=scratch/ns3-dsw/data/links.csv \
---proAppStart=0 \
+--warmupTime=6 \
+--simDuration=24 \
 --pcap=0 \
 --anim=1 \
 --log=info \
@@ -18,8 +19,10 @@
 --propSpeed=2e8 \
 --delayFactor=1.0 \
 --simulationStep=1.0 \
---proAppDuration=1.25 \
 --proAppUpdateInterval=0.1 \
 --proSinkXml=scratch/ns3-dsw/out/pro_sink_stats.xml \
 --enableLinkUtil=1 \
---linkUtilInterval=0.1 "
+--linkUtilInterval=0.1 \
+--enablePowerCoupling=1 \
+--priceCsv=scratch/ns3-dsw/data/daily_price.csv \
+--powerCostXmlBase=scratch/ns3-dsw/out/power_cost "

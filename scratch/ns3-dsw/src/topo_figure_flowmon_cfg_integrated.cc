@@ -8,7 +8,6 @@
 #include "ns3/flow-monitor-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
-#include "ns3/ipv4-routing-helper.h" // <== 为打印路由表所需
 #include "ns3/log.h"
 #include "ns3/mobility-module.h"
 #include "ns3/names.h"
@@ -16,7 +15,7 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
 #include "ns3/pro-sink-app.h"
-#include "ns3/string.h"                 // 用于 StringValue
+#include "ns3/string.h" // 用于 StringValue
 #include "ns3/traffic-control-module.h" //Pacing
 
 #include <algorithm>
@@ -54,6 +53,10 @@ struct NodeSpec
     std::string name;
     NodeType type = NodeType::UNKNOWN; // Producer or Consumer
     double appRate = 0.0;              // lambda or consumerRate
+    
+    double basePower = 0.0;     // MW
+    double fullPower = 0.0;     // MW
+    double phaseOffset = 0.0;   // hours
 };
 
 struct LinkSpec
@@ -63,7 +66,62 @@ struct LinkSpec
     uint32_t id = 0;       // 标识符（可从 CSV 读取，若缺省则自动分配）
 };
 
-// nodes.csv: id,x,y,name,rate
+static std::vector<double>
+LoadCsvPrices(const std::string& path)
+{
+    std::vector<double> prices;
+    std::ifstream fin(path.c_str());
+    if (!fin.is_open())
+    {
+        NS_FATAL_ERROR("Cannot open price file: " << path);
+    }
+    std::string line;
+    uint32_t ln = 0;
+    while (std::getline(fin, line))
+    {
+        ++ln;
+        std::string s = DswUtils::Trim(line);
+        if (s.empty() || s[0] == '#')
+            continue;
+        
+        std::stringstream ss(s);
+        std::string hour, minute, priceStr;
+
+        // 1. 解析列
+        std::getline(ss, hour, ',');
+        std::getline(ss, minute, ',');
+        std::getline(ss, priceStr);
+
+        hour = DswUtils::Trim(hour);
+        priceStr = DswUtils::Trim(priceStr);
+
+        if (priceStr.empty())
+        {
+             NS_LOG_WARN("Skip price line " << ln << ": Price column is empty. Line: " << s);
+             continue;
+        }
+
+        try
+        {
+            // 2. 转换第三列
+            prices.push_back(std::stod(priceStr));
+        }
+        catch (const std::exception& e)
+        {
+            // 3. 检查是否为表头
+            if (ln == 1 && (hour == "hour" || priceStr == "price"))
+            {
+                NS_LOG_WARN("Skip header in price.csv: " << s);
+                continue;
+            }
+            NS_LOG_WARN("Skip invalid price line " << ln << ": " << s << " (" << e.what() << ")");
+        }
+    }
+    NS_LOG_INFO("Loaded " << prices.size() << " price points from " << path);
+    return prices;
+}
+
+// nodes.csv: id,x,y,name,rate[,baseP,fullP,phase]
 static std::vector<NodeSpec>
 LoadCsvNodes(const std::string& path)
 {
@@ -83,18 +141,26 @@ LoadCsvNodes(const std::string& path)
             continue;
 
         std::stringstream ss(s);
-        std::string fid, fx, fy, fname, frate;
+        std::string fid, fx, fy, fname, frate, fbaseP, ffullP, fphase;
+        
         std::getline(ss, fid, ',');
         std::getline(ss, fx, ',');
         std::getline(ss, fy, ',');
         std::getline(ss, fname, ',');
-        std::getline(ss, frate);
+        std::getline(ss, frate, ',');
+        std::getline(ss, fbaseP, ',');
+        std::getline(ss, ffullP, ',');
+        std::getline(ss, fphase);
+
 
         fid = DswUtils::Trim(fid);
         fx = DswUtils::Trim(fx);
         fy = DswUtils::Trim(fy);
         fname = DswUtils::Trim(fname);
         frate = DswUtils::Trim(frate);
+        fbaseP = DswUtils::Trim(fbaseP);
+        ffullP = DswUtils::Trim(ffullP);
+        fphase = DswUtils::Trim(fphase);
 
         if (!std::all_of(fid.begin(), fid.end(), ::isdigit))
         {
@@ -147,10 +213,18 @@ LoadCsvNodes(const std::string& path)
                                               << ns.appRate);
                 continue;
             }
+            
+            if (ns.type == NodeType::CONSUMER)
+            {
+                if (!fbaseP.empty()) ns.basePower = std::stod(fbaseP);
+                if (!ffullP.empty()) ns.fullPower = std::stod(ffullP);
+                if (!fphase.empty()) ns.phaseOffset = std::stod(fphase);
+            }
+
         }
         catch (const std::exception& e)
         {
-            NS_LOG_WARN("Skip node line " << ln << ": Invalid rate value '" << frate << "' ("
+            NS_LOG_WARN("Skip node line " << ln << ": Invalid numeric value in '" << s << "' ("
                                           << e.what() << ")");
             continue;
         }
@@ -254,7 +328,7 @@ SetupLogging(const std::string& levelStr)
     if (s == "all")
         lv = LOG_LEVEL_ALL;
     LogComponentEnable("TopoFigureFlowmonCfg", lv);
-    LogComponentEnable("ProSinkApp", lv);             // 启用新 App 的日志
+    LogComponentEnable("ProSinkApp", lv); // 启用新 App 的日志
     LogComponentEnable("LinkUtilizationMonitor", lv); // 启用链路监控日志
     NS_LOG_INFO("Logging level set to: " << s);
 }
@@ -333,7 +407,8 @@ OnSinkTaskCompleted(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uint3
                   << " Core-Id=\"Core-" << nodeId << "\""
                   << " Edge-Id=\"Edge-" << producerId << "\""
                   << " Task-Id=\"" << producerId << "-" << taskId << "\""
-                  << " TotalCompleted=\"" << totalCompleted << "\"/>" << std::endl;
+                  << " TotalCompleted=\"" << totalCompleted << "\"/>"
+                  << std::endl;
     }
 }
 
@@ -356,7 +431,6 @@ OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
                   << std::endl;
     }
 }
-
 /**
  * @brief 当 Sink 报告算力利用率时 (Trace 回调)
  * @param nodeId 消费者的节点 ID (用于 "Core-Id")
@@ -368,9 +442,10 @@ OnSinkUtilization(uint32_t nodeId, double utilization)
     if (g_utilXmlFile.is_open())
     {
         g_utilXmlFile << "  <Event type=\"CoreUtil\""
-                      << " Time=\"" << Simulator::Now().GetSeconds() << "\""
-                      << " Core-Id=\"Core-" << nodeId << "\""
-                      << " Utilization=\"" << utilization << "\"/>" << std::endl;
+                  << " Time=\"" << Simulator::Now().GetSeconds() << "\""
+                  << " Core-Id=\"Core-" << nodeId << "\""
+                  << " Utilization=\"" << utilization << "\"/>"
+                  << std::endl;
     }
 }
 
@@ -381,12 +456,14 @@ main(int argc, char* argv[])
     std::string nodesCsv = "scratch/nodes.csv";
     std::string linksCsv = "scratch/links.csv";
     std::string logLevel = "info"; // off|warn|info|debug|all
+    double warmupTime = 6.0;     // 仿真预热时间 (s) - [MODIFIED]
+    double simDuration = 24.0;   // 实际仿真时间 (s, 1s=1h) - [MODIFIED]
+    
     std::string flowmonXml = "topo-figure.perlink.flowmon.xml";
     std::string statsCsv = ""; // 若非空则导出 CSV 指标
     std::string animXml = "topo-figure.xml";
-    std::string dotPath = "";     // 若非空导出 .dot
-    double dotScale = 80.0;       // dot 坐标缩放
-    double proAppStartTime = 0.0; // Pro-Sink App 的启动时间 (s)
+    std::string dotPath = ""; // 若非空导出 .dot
+    double dotScale = 80.0;   // dot 坐标缩放
     bool enablePcap = false;
     bool enableAnim = true;
 
@@ -397,26 +474,27 @@ main(int argc, char* argv[])
     double delayFactor = 1.0;      // 额外缩放系数
 
     // --- Pro-Sink App 参数 ---
-    double simulationStepMs = 1.0;                     // 默认步长 1ms
-    double proAppDuration = 0.5;                       // 默认运行 0.5s
-    double proAppUpdateIntervalSec = 0.25;             // 默认算力更新间隔 0.25s
+    double simulationStepMs = 1.0;                             // 默认步长 1ms
+    double proAppUpdateIntervalSec = 0.25;                      // 默认算力更新间隔 0.25s
     std::string proSinkXmlFile = "pro_sink_stats.xml"; // 默认 XML 输出文件名
-    std::string nodeUtilXmlFile = "node_util.xml";     // 默认利用率 XML 输出文件名
+    std::string nodeUtilXmlFile = "node_util.xml"; // 默认利用率 XML 输出文件名
+
+    // --- 功率/成本 参数 ---
+    bool enablePowerCoupling = false; // 默认关闭
+    std::string priceCsv = "daily_price.csv";
+    std::string powerCostXmlBase = "scratch/ns3-dsw/out/power_cost"; 
 
     // --- 链路监控参数 ---
-    double linkUtilIntervalSec = 0.25;             // 默认 0.25s 轮询
-    std::string linkUtilXmlFile = "link_util.xml"; // 默认 XML
-    bool enableLinkUtil = true;                    // 默认启用
-    // router
-    // --- 启用 IPv4 全局路由的 ECMP（逐包随机）---
-    Config::SetDefault("ns3::Ipv4GlobalRouting::RandomEcmpRouting", BooleanValue(true));
-    // 可选：若你会在仿真中上下线接口，希望全局路由自动重算：
-    Config::SetDefault("ns3::Ipv4GlobalRouting::RespondToInterfaceEvents", BooleanValue(true));
+    double linkUtilIntervalSec = 0.25; // 默认 0.25s 轮询
+    std::string linkUtilXmlFile = "scratch/ns3-dsw/out/link_util.xml"; // 默认 XML
+    bool enableLinkUtil = true; // 默认启用
+    // --- End MODIFICATION ---
 
     CommandLine cmd;
-    cmd.AddValue("nodes", "CSV of nodes: id[,x,y[,name]]", nodesCsv);
+    cmd.AddValue("nodes", "CSV of nodes: id[,x,y[,name,rate,baseP,fullP,phase]]", nodesCsv);
     cmd.AddValue("links", "CSV of links: a,b,rate[,id]", linksCsv);
-    cmd.AddValue("proAppStart", "Pro-Sink App start time (s)", proAppStartTime);
+    cmd.AddValue("warmupTime", "Simulation warmup time (s)", warmupTime);
+    cmd.AddValue("simDuration", "Actual simulation duration (s) (1s=1h)", simDuration);
     cmd.AddValue("pcap", "Enable pcap on all links (0/1)", enablePcap);
     cmd.AddValue("anim", "Enable NetAnim output (0/1)", enableAnim);
     cmd.AddValue("log", "Log level: off|warn|info|debug|all", logLevel);
@@ -434,18 +512,18 @@ main(int argc, char* argv[])
 
     // --- Pro-Sink App 命令行参数 ---
     cmd.AddValue("simulationStep", "Simulation step for Pro-Sink App (ms)", simulationStepMs);
-    cmd.AddValue("proAppDuration", "Duration for Pro-Sink App (s)", proAppDuration);
-    cmd.AddValue("proAppUpdateInterval",
-                 "Pro-Sink App utilization report interval (s)",
-                 proAppUpdateIntervalSec);
+    cmd.AddValue("proAppUpdateInterval", "Pro-Sink App utilization/power report interval (s)", proAppUpdateIntervalSec);
     cmd.AddValue("proSinkXml", "Pro-Sink App XML output file", proSinkXmlFile);
     cmd.AddValue("nodeUtilXml", "Node Utilization XML output file", nodeUtilXmlFile);
 
+    // --- Added power params ---
+    cmd.AddValue("enablePowerCoupling", "Enable Power/Cost Coupling features (0/1)", enablePowerCoupling);
+    cmd.AddValue("priceCsv", "Path to the 288-point (5min) price CSV", priceCsv);
+    cmd.AddValue("powerCostXmlBase", "Base path for power/cost XML output", powerCostXmlBase);
+
     // --- 链路监控命令行参数 ---
     cmd.AddValue("enableLinkUtil", "Enable Link Utilization Monitor (0/1)", enableLinkUtil);
-    cmd.AddValue("linkUtilInterval",
-                 "Link Utilization Monitor poll interval (s)",
-                 linkUtilIntervalSec);
+    cmd.AddValue("linkUtilInterval", "Link Utilization Monitor poll interval (s)", linkUtilIntervalSec);
     cmd.AddValue("linkUtilXml", "Link Utilization Monitor XML output file", linkUtilXmlFile);
 
     cmd.Parse(argc, argv);
@@ -458,16 +536,18 @@ main(int argc, char* argv[])
         linkMonitor = CreateObject<LinkUtilizationMonitor>();
         linkMonitor->SetPollInterval(Seconds(linkUtilIntervalSec));
         linkMonitor->SetXmlOutput(linkUtilXmlFile);
-        NS_LOG_INFO("Link Utilization Monitor enabled. Interval="
-                    << linkUtilIntervalSec << "s, Output=" << linkUtilXmlFile);
+        NS_LOG_INFO("Link Utilization Monitor enabled. Interval=" << linkUtilIntervalSec
+                                                                 << "s, Output=" << linkUtilXmlFile);
     }
 
     // --- TCP Pacing 关键配置 (从 example 复制) ---
     NS_LOG_INFO("Enabling TCP Cubic and Pacing...");
-    Config::SetDefault("ns3::TcpL4Protocol::SocketType",
+    Config::SetDefault("ns3::TcpL4Protocol::SocketType", 
                        TypeIdValue(TypeId::LookupByName("ns3::TcpCubic")));
-    Config::SetDefault("ns3::TcpSocketState::EnablePacing", BooleanValue(true));
-    Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", BooleanValue(true));
+    Config::SetDefault("ns3::TcpSocketState::EnablePacing", 
+                       BooleanValue(true));
+    Config::SetDefault("ns3::TcpSocketState::PaceInitialWindow", 
+                       BooleanValue(true));
     // --- TCP Pacing ---
 
     // 确保 XML 输出在 scratch/ns3-dsw/out/ 目录下
@@ -480,14 +560,40 @@ main(int argc, char* argv[])
         nodeUtilXmlFile = "scratch/ns3-dsw/out/" + nodeUtilXmlFile;
     }
 
-    // 解析消费者列表
+
     // --- 解析 Pro-Sink 时间参数 ---
     Time simulationStep = MilliSeconds(simulationStepMs);
     Time proAppUpdateInterval = Seconds(proAppUpdateIntervalSec);
+    double proAppStartTime = warmupTime;
+    double proAppStopTime = proAppStartTime + simDuration;
     NS_LOG_INFO("Pro-Sink simulation step: " << simulationStep);
-    NS_LOG_INFO("Pro-Sink duration: " << proAppDuration << "s");
+    NS_LOG_INFO("Pro-Sink Apps will run from " << proAppStartTime << "s to " << proAppStopTime << "s (Duration: " << simDuration << "s)");
+    
+    if (enablePowerCoupling)
+    {
+        NS_LOG_INFO("Power/Cost Coupling ENABLED. Update interval: " << proAppUpdateInterval.GetSeconds() << "s");
+    }
+    else
+    {
+        NS_LOG_INFO("Power/Cost Coupling DISABLED.");
+    }
 
-    // 读取配置
+    std::vector<double> priceProfile;
+    if (enablePowerCoupling)
+    {
+        priceProfile = LoadCsvPrices(priceCsv);
+        if (priceProfile.empty())
+        {
+            NS_FATAL_ERROR("Failed to load price profile or profile is empty: " << priceCsv);
+        }
+        if (priceProfile.size() != 288)
+        {
+            NS_LOG_WARN("Price profile does not contain 288 points (got " << priceProfile.size() 
+                        << "). Time scaling may be incorrect.");
+        }
+    }
+
+    // --- 读取配置 ---
     auto nodeSpecs = LoadCsvNodes(nodesCsv);
     auto linkSpecs = LoadCsvLinks(linksCsv);
     if (nodeSpecs.empty())
@@ -626,11 +732,11 @@ main(int argc, char* argv[])
             // delay CSV column removed — use a sensible default when not computing by distance
             p2p.SetChannelAttribute("Delay", TimeValue(MilliSeconds(1)));
         }
-
+        
         // 原始方向：a 在前、b 在后 -> IP 地址 index 0 属于 a，index 1 属于 b
         NetDeviceContainer dev = p2p.Install(nodes.Get(l.a), nodes.Get(l.b));
         allP2pDevices.Add(dev); // 将设备添加到容器
-
+        
         Ipv4InterfaceContainer ifc = address.Assign(dev);
         address.NewNetwork();
 
@@ -695,13 +801,12 @@ main(int argc, char* argv[])
             // rec.a 和 rec.b 是原始的 linkSpec.a 和 linkSpec.b
             // rec.ifc.Get(0) 对应 rec.a 上的设备
             // rec.ifc.Get(1) 对应 rec.b 上的设备
-            linkMonitor->RegisterLink(
-                rec.id,                                                    // linkId
-                rec.a,                                                     // nodeAId
-                rec.b,                                                     // nodeBId
-                rec.ifc.Get(0).first->GetNetDevice(rec.ifc.Get(0).second), // devA
-                rec.ifc.Get(1).first->GetNetDevice(rec.ifc.Get(1).second), // devB
-                DataRate(rec.rate));                                       // rate
+            linkMonitor->RegisterLink(rec.id,       // linkId
+                                      rec.a,        // nodeAId
+                                      rec.b,        // nodeBId
+                                      rec.ifc.Get(0).first->GetNetDevice(rec.ifc.Get(0).second), // devA
+                                      rec.ifc.Get(1).first->GetNetDevice(rec.ifc.Get(1).second), // devB
+                                      DataRate(rec.rate)); // rate
         }
     }
 
@@ -715,8 +820,7 @@ main(int argc, char* argv[])
     std::map<uint32_t, Ipv4Address> nodeIpMap;
     for (uint32_t nodeId : nodeIds)
     {
-        if (nodeId == 0)
-            continue;
+        if (nodeId == 0) continue; 
 
         Ptr<Ipv4> ipv4 = nodes.Get(nodeId)->GetObject<Ipv4>();
         if (ipv4->GetNInterfaces() <= 1)
@@ -741,8 +845,9 @@ main(int argc, char* argv[])
             if (nodeIpMap.count(ns.id))
             {
                 sinkAddresses.push_back(InetSocketAddress(nodeIpMap[ns.id], proPort));
-                NS_LOG_INFO("Consumer " << ns.id << " (core) identified at IP: " << nodeIpMap[ns.id]
-                                        << " with rate " << ns.appRate << " Tasks/s ");
+                NS_LOG_INFO("Consumer " << ns.id << " (core) ... Rate=" << ns.appRate 
+                                    << " P_base=" << ns.basePower << ", P_full=" << ns.fullPower
+                                    << ", Phase=" << ns.phaseOffset << "h");
             }
             else
             {
@@ -764,23 +869,11 @@ main(int argc, char* argv[])
     // 路由
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
     NS_LOG_INFO("Global routes populated.");
-    // --- 导出所有节点的 IPv4 路由表到文件 ---
-    // 目录沿用你现有的 out/ 输出目录
-    auto routingStream =
-        Create<OutputStreamWrapper>("scratch/ns3-dsw/out/routing-ecmp.txt", std::ios::out);
-
-    // 在 t=0.0s 时刻打印一次（也可改为 proAppStartTime 或任意时间点）
-    Ipv4RoutingHelper::PrintRoutingTableAllAt(Seconds(0.0), routingStream);
-
-    // 如果想周期性保存（例如每 0.5s 一次），改用：
-    // Ipv4RoutingHelper::PrintRoutingTableAllEvery(Seconds(0.5), routingStream);
 
     // --- 用于轮询分配消费者的索引 ---
     uint32_t sinkRoundRobinIndex = 0;
 
     // --- 安装 Pro-Sink 应用 ---
-    double proAppStopTime = proAppStartTime + proAppDuration;
-
     // Pro-Sink 应用参数 (硬编码)
     uint32_t proTaskSize = 256 * 1024; // (Bytes)
     uint32_t proPacketSize = 1024;     // (Bytes)
@@ -809,10 +902,41 @@ main(int argc, char* argv[])
         {
             // 这是消费者 (Sink)
             Ptr<MySink> sinkApp = CreateObject<MySink>();
-            sinkApp->Setup(ns.appRate, simulationStep, proAppUpdateInterval);
-            // TCP 版本 MySink 需要通过 Attribute 设置大小
+
+            bool canEnablePower = enablePowerCoupling && (ns.fullPower > 0.0);
+            
+            if (canEnablePower)
+            {
+                std::string powerCostXmlFile = powerCostXmlBase + "_node" + std::to_string(ns.id) + ".xml";
+                NS_LOG_INFO("Node " << ns.id << " (Consumer) enabling power coupling. Output -> " << powerCostXmlFile);
+
+                sinkApp->Setup(ns.id,
+                               ns.appRate, 
+                               simulationStep, 
+                               proAppUpdateInterval,
+                               warmupTime,
+                               ns.basePower,
+                               ns.fullPower,
+                               ns.phaseOffset,
+                               priceProfile,
+                               powerCostXmlFile);
+            }
+            else
+            {
+                if (enablePowerCoupling)
+                {
+                     NS_LOG_WARN("Node " << ns.id << " (Consumer): Power coupling SKIPPED. " 
+                                 << "fullPower=" << ns.fullPower << " (must be > 0 in nodes.csv).");
+                }
+                sinkApp->Setup(ns.id, 
+                               ns.appRate, 
+                               simulationStep, 
+                               proAppUpdateInterval);
+            }
+
             sinkApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             sinkApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));
+
             node->AddApplication(sinkApp);
             sinkApp->SetStartTime(Seconds(proAppStartTime));
             sinkApp->SetStopTime(Seconds(proAppStopTime));
@@ -831,9 +955,9 @@ main(int argc, char* argv[])
             }
             Ptr<MyProducer> producerApp = CreateObject<MyProducer>();
 
-            // 使用轮询 (Round-Robin) 方式将生产者分配给消费者
-            Address targetSink = sinkAddresses[sinkRoundRobinIndex];
-
+        // 使用轮询 (Round-Robin) 方式将生产者分配给消费者
+            Address targetSink = sinkAddresses[sinkRoundRobinIndex]; 
+            
             // 更新索引，使其在 sinkAddresses 列表的大小上循环
             sinkRoundRobinIndex = (sinkRoundRobinIndex + 1) % sinkAddresses.size();
 
@@ -841,8 +965,8 @@ main(int argc, char* argv[])
                                ns.appRate,
                                proTaskSize,
                                proPacketSize,
-                               simulationStep);
-
+                               simulationStep); 
+            
             // 同样设置 Attribute (与 example 保持一致)
             producerApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             producerApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));
@@ -855,7 +979,7 @@ main(int argc, char* argv[])
         }
         // (ns.type == UNKNOWN 的节点会被自动跳过)
     }
-
+    
     if (!sinkAddresses.empty())
     {
         NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
@@ -863,12 +987,9 @@ main(int argc, char* argv[])
     }
     else
     {
-        NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
+         NS_LOG_INFO("Installed " << sinks.size() << " consumers and " << producers.size()
                                  << " producers.");
     }
-
-    NS_LOG_INFO("Pro-Sink Apps will run from " << proAppStartTime << "s to " << proAppStopTime
-                                               << "s.");
 
     // --- 打开 XML 文件并连接 Traces ---
     g_xmlFile.open(proSinkXmlFile);
@@ -880,7 +1001,7 @@ main(int argc, char* argv[])
     {
         g_xmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
         g_xmlFile << "<ProSinkStats simulationStep=\"" << simulationStep << "\" duration=\""
-                  << proAppDuration << "\">" << std::endl;
+                  << simDuration << "\">" << std::endl;
     }
     // --- Open core util XML file ---
     g_utilXmlFile.open(nodeUtilXmlFile);
@@ -891,8 +1012,8 @@ main(int argc, char* argv[])
     else
     {
         g_utilXmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
-        g_utilXmlFile << "<NodeUtilizationStats simulationStep=\"" << simulationStep
-                      << "\" duration=\"" << proAppDuration << "\">" << std::endl;
+        g_utilXmlFile << "<NodeUtilizationStats simulationStep=\"" << simulationStep << "\" duration=\""
+                        << simDuration << "\">" << std::endl;
     }
 
     // 连接 Sink Traces
@@ -921,17 +1042,17 @@ main(int argc, char* argv[])
             else
                 label << id << ":" << nm;
             anim.UpdateNodeDescription(n, label.str());
-
+            
             // 根据新类型为节点着色
             if (nodeSpecMap.count(id))
             {
-                if (nodeSpecMap.at(id).type == NodeType::PRODUCER)
+                if(nodeSpecMap.at(id).type == NodeType::PRODUCER)
                 {
                     anim.UpdateNodeColor(n, 255, 0, 0); // 红色 (Producer)
                 }
                 else if (nodeSpecMap.at(id).type == NodeType::CONSUMER)
                 {
-                    anim.UpdateNodeColor(n, 0, 0, 255); // 蓝色 (Consumer)
+                     anim.UpdateNodeColor(n, 0, 0, 255); // 蓝色 (Consumer)
                 }
                 else
                 {
@@ -947,7 +1068,7 @@ main(int argc, char* argv[])
     Ptr<FlowMonitor> monitor = fmh.InstallAll();
 
     // --- 设置总仿真停止时间 ---
-    Time simStopTime = Seconds(proAppStopTime + 0.5); // [修改] 增加 0.5s 缓冲
+    Time simStopTime = Seconds(proAppStopTime + 0.5); // 增加 0.5s 缓冲
     Simulator::Stop(simStopTime);
     NS_LOG_INFO("Simulation will stop at " << simStopTime.GetSeconds() << "s.");
 
@@ -1029,6 +1150,7 @@ main(int argc, char* argv[])
 
     monitor->SerializeToXmlFile(flowmonXml, true, true);
     NS_LOG_INFO("FlowMonitor XML written: " << flowmonXml);
+
 
     // Graphviz 可视化导出
     if (!dotPath.empty())
