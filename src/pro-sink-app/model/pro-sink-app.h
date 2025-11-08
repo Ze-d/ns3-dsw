@@ -16,6 +16,9 @@
 #include <list>    // 包含 list
 #include <utility> // 包含 pair
 
+#include <fstream> 
+#include <string> 
+
 namespace ns3 {
 
 // --- 0. 自定义包头 (TaskHeader) 声明 ---
@@ -50,42 +53,59 @@ public:
     MySink();
     virtual ~MySink();
 
-    void Setup(double tasksPerSecond, Time simulationStep, Time updateInterval);
+    /**
+     * @brief (Simple Setup) 仅配置基础任务处理功能。
+     */
+    void Setup(uint32_t nodeId,
+               double tasksPerSecond, 
+               Time simulationStep, 
+               Time updateInterval);
+
+    /**
+     * @brief (Extended Setup) 配置任务处理 + 电力耦合功能。
+     */
+    void Setup(uint32_t nodeId,
+               double tasksPerSecond, 
+               Time simulationStep, 
+               Time updateInterval,
+               double warmupTime,
+               double basePower,
+               double fullPower,
+               double phaseOffset,
+               const std::vector<double>& priceProfile,
+               const std::string& powerCostXmlPath);
 
     TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
-    // --- MODIFICATION: Added uint32_t for NodeId ---
     TracedCallback<uint32_t, double> m_utilizationTrace; // <NodeId, Utilization>
 
 private:
     virtual void StartApplication(void);
     virtual void StopApplication(void);
 
-    // --- TCP 监听和连接管理 ---
+    // --- TCP ---
     bool HandleAccept(Ptr<Socket> socket, const Address& from);
     void HandleNewConnection(Ptr<Socket> socket, const Address& from);
     void CleanupConnection(Ptr<Socket> socket);
-    
-    // --- TCP 回调 ---
     void HandleRead(Ptr<Socket> socket);
     void HandleNormalClose(Ptr<Socket> socket);
     void HandleErrorClose(Ptr<Socket> socket);
-    
-    // --- TCP 流处理 ---
     void ProcessSocketBuffer(Ptr<Socket> socket);
 
     // --- 任务处理 ---
     void ProcessTasks();
-    // --- 算力统计 ---
-    void ReportUtilization();
-
-    Ptr<Socket> m_listenSocket; // TCP 监听套接字
-    std::list<Ptr<Socket>> m_acceptedSockets; // 跟踪所有活跃连接
     
+    // --- 算力统计 & 功率/成本计算 ---
+    void ReportUtilization();
+    uint32_t GetCurrentPriceIndex() const;
+
+
+    Ptr<Socket> m_listenSocket; 
+    std::list<Ptr<Socket>> m_acceptedSockets; 
     std::map<Ptr<Socket>, Buffer> m_socketBuffers;
 
     uint16_t    m_port;
     uint32_t    m_taskSize;
-    uint32_t    m_packetSize; // 用于解析流
+    uint32_t    m_packetSize; 
 
     std::map<std::pair<uint32_t, uint32_t>, uint32_t> m_currentRxBytesPerTask;
 
@@ -98,9 +118,19 @@ private:
     bool        m_running;
 
     // --- 算力统计成员 ---
-    Time        m_updateInterval;       // 报告利用率的间隔
-    Time        m_totalTimeInInterval;  // 间隔内的总时间累加器
-    Time        m_idleTimeInInterval;   // 间隔内的空闲时间累加器
+    Time        m_updateInterval;       
+    Time        m_totalTimeInInterval;  
+    Time        m_idleTimeInInterval;   
+        
+    // --- Power and Cost members ---
+    bool                m_powerCouplingEnabled;   // 开关
+    double              m_warmupTime;             // 仿真预热时间 (s)
+    double              m_basePower;              // 基础功率 (MW)
+    double              m_fullPower;              // 满载功率 (MW)
+    double              m_pricePhaseOffsetHours;  // 电价相位偏移 (h)
+    std::vector<double> m_priceProfile;           // 电价曲线 (由 main 传入)
+    std::ofstream       m_powerCostXmlFile;       // 功率成本 XML 输出流
+    double              m_totalAccumulatedCost;   // 累积的总成本
 };
 
 
