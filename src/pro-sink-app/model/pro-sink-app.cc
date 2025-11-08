@@ -1,4 +1,5 @@
 #include "pro-sink-app.h"
+#include "price-aware-scheduler.h"
 #include "ns3/log.h"
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
@@ -96,6 +97,10 @@ TypeId MySink::GetTypeId(void)
                          "Trace triggered periodically with the compute utilization (0.0 to 1.0).",
                          MakeTraceSourceAccessor(&MySink::m_utilizationTrace),
                          "ns3::TracedCallback<uint32_t, double>") // <NodeId, Utilization>
+        .AddTraceSource("QueueLength",
+                         "Trace triggered periodically with the queue length (number of pending tasks).",
+                         MakeTraceSourceAccessor(&MySink::m_queueLengthTrace),
+                         "ns3::TracedCallback<uint32_t, uint32_t>") // <NodeId, QueueLength>
         .AddAttribute("Port",
                       "Port on which to listen for connections.",
                       UintegerValue(8080),
@@ -501,6 +506,9 @@ MySink::ReportUtilization()
     // 3. 触发 Utilization Trace
     m_utilizationTrace(GetNode()->GetId(), utilization);
 
+    // 3.1 触发队列长度 Trace
+    m_queueLengthTrace(GetNode()->GetId(), m_taskQueue.size());
+
     // --- 4. (Guarded) 计算功率、电价和成本 ---
     if (m_powerCouplingEnabled)
     {
@@ -591,7 +599,9 @@ MyProducer::MyProducer()
       m_lambda(0.0),
       m_interTaskTimeGenerator(nullptr),
       m_running(false),
-      m_connected(false)
+      m_connected(false),
+      m_enablePriceAwareScheduling(false),
+      m_scheduler(nullptr)
 {
 }
 
@@ -610,6 +620,22 @@ MyProducer::Setup(Address sinkAddress, double lambda, uint32_t taskSize, uint32_
     m_lambda = lambda;
     m_interTaskTimeGenerator = CreateObject<ExponentialRandomVariable>();
     m_interTaskTimeGenerator->SetAttribute("Mean", DoubleValue(1.0 / m_lambda));
+}
+
+void
+MyProducer::EnablePriceAwareScheduling(bool enable)
+{
+    NS_LOG_FUNCTION(this << enable);
+    m_enablePriceAwareScheduling = enable;
+    NS_LOG_INFO("Price-aware scheduling " << (enable ? "enabled" : "disabled") << " for producer on node " << GetNode()->GetId());
+}
+
+void
+MyProducer::SetScheduler(Ptr<PriceAwareScheduler> scheduler)
+{
+    NS_LOG_FUNCTION(this << scheduler);
+    m_scheduler = scheduler;
+    NS_LOG_INFO("Scheduler set for producer on node " << GetNode()->GetId());
 }
 
 void
@@ -738,10 +764,47 @@ void
 MyProducer::SendNextTask()
 {
     // 必须连接上、不在发送中、且队列不为空
-    if (!m_running || m_isSending || !m_connected || m_taskQueue.empty())
+    if (!m_running || m_isSending || m_taskQueue.empty())
     {
         return;
     }
+
+    // 如果没有连接，先连接
+    if (!m_connected)
+    {
+        // 动态选择最优目标 (价格感知调度)
+        if (m_enablePriceAwareScheduling && m_scheduler)
+        {
+            double nowSeconds = Simulator::Now().GetSeconds();
+            Address newAddress = m_scheduler->ScheduleNextTask(nowSeconds);
+
+            if (newAddress != m_peerAddress)
+            {
+                NS_LOG_INFO("Switching to new target: " << InetSocketAddress::ConvertFrom(newAddress).GetIpv4());
+                m_peerAddress = newAddress;
+                if (m_socket)
+                {
+                    m_socket->Close();
+                    m_socket = nullptr;
+                }
+            }
+        }
+
+        // 重新连接
+        TypeId tid = TypeId::LookupByName("ns3::TcpSocketFactory");
+        m_socket = Socket::CreateSocket(GetNode(), tid);
+
+        m_socket->SetConnectCallback(MakeCallback(&MyProducer::ConnectionSucceeded, this),
+                                     MakeCallback(&MyProducer::ConnectionFailed, this));
+        m_socket->SetSendCallback(MakeCallback(&MyProducer::HandleSend, this));
+        m_socket->SetCloseCallbacks(MakeCallback(&MyProducer::NormalClose, this),
+                                    MakeCallback(&MyProducer::ErrorClose, this));
+
+        m_socket->Connect(m_peerAddress);
+        return; // 等待连接成功
+    }
+
+    // 如果已连接，继续发送
     m_isSending = true;
     m_taskQueue.pop();
     m_totalTasksSent++;
@@ -750,8 +813,8 @@ MyProducer::SendNextTask()
     m_currentSendingTaskId = m_totalTasksSent;
     m_totalBytesSentForCurrentTask = 0; // 重置字节计数器
 
-    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 开始发送任务 " 
-                  << m_currentSendingProducerId << "-" << m_currentSendingTaskId 
+    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 开始发送任务 "
+                  << m_currentSendingProducerId << "-" << m_currentSendingTaskId
                   << " 到 " << InetSocketAddress::ConvertFrom(m_peerAddress).GetIpv4());
 
     m_taskSentTrace(GetNode()->GetId(), m_totalTasksSent, m_peerAddress);

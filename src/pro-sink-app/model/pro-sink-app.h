@@ -16,8 +16,13 @@
 #include <list>    // 包含 list
 #include <utility> // 包含 pair
 
-#include <fstream> 
-#include <string> 
+#include <fstream>
+#include <string>
+
+// 前向声明
+namespace ns3 {
+class PriceAwareScheduler;
+};
 
 namespace ns3 {
 
@@ -77,6 +82,7 @@ public:
 
     TracedCallback<uint32_t, uint32_t, uint32_t, uint32_t> m_taskCompletedTrace;
     TracedCallback<uint32_t, double> m_utilizationTrace; // <NodeId, Utilization>
+    TracedCallback<uint32_t, uint32_t> m_queueLengthTrace; // <NodeId, QueueLength>
 
 private:
     virtual void StartApplication(void);
@@ -144,6 +150,18 @@ public:
 
     void Setup(Address sinkAddress, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
 
+    /**
+     * @brief 启用价格感知调度
+     * @param enable 是否启用
+     */
+    void EnablePriceAwareScheduling(bool enable = true);
+
+    /**
+     * @brief 设置调度器
+     * @param scheduler 调度器实例
+     */
+    void SetScheduler(Ptr<PriceAwareScheduler> scheduler);
+
     TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
 
 private:
@@ -178,7 +196,11 @@ private:
     double m_lambda;
     Ptr<ExponentialRandomVariable> m_interTaskTimeGenerator;
     std::queue<bool> m_taskQueue;
-    
+
+    // --- 价格感知调度 ---
+    bool m_enablePriceAwareScheduling;  // 是否启用价格感知调度
+    Ptr<PriceAwareScheduler> m_scheduler;  // 调度器实例
+
     bool m_running;
     bool m_connected;
 };

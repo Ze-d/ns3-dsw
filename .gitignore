@@ -53,3 +53,10 @@ cmake-build-release/
 
 # Ignore local cache used by e.g. clangd
 .cache/
+
+CLAUDE.md
+
+# Simulation output files
+scratch/ns3-dsw/out/
+*.xml
+*.csv
