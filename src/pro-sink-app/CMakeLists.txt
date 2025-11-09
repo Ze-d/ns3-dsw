@@ -5,10 +5,12 @@ endif()
 
 set(headers
     model/pro-sink-app.h
+    model/price-aware-scheduler.h
 )
 
 set(sources
     model/pro-sink-app.cc
+    model/price-aware-scheduler.cc
 )
 
 build_lib(

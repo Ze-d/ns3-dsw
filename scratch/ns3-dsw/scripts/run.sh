@@ -1,7 +1,29 @@
 #!/usr/bin/env bash
+
+# 解析命令行参数
+ENABLE_PRICE_SCHEDULING=0
+QUEUE_PENALTY_FACTOR=0.1
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --enablePriceAwareScheduling)
+            ENABLE_PRICE_SCHEDULING="$2"
+            shift 2
+            ;;
+        --queuePenaltyFactor)
+            QUEUE_PENALTY_FACTOR="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 ./ns3 build
 
-./ns3 run "topo_figure_flowmon_cfg_integrated \
+# 构建命令参数
+CMD="topo_figure_flowmon_cfg_integrated \
 --nodes=scratch/ns3-dsw/data/nodes.csv \
 --links=scratch/ns3-dsw/data/links.csv \
 --warmupTime=6 \
@@ -25,4 +47,12 @@
 --linkUtilInterval=0.1 \
 --enablePowerCoupling=1 \
 --priceCsv=scratch/ns3-dsw/data/daily_price.csv \
---powerCostXmlBase=scratch/ns3-dsw/out/power_cost "
+--powerCostXmlBase=scratch/ns3-dsw/out/power_cost \
+--enablePriceAwareScheduling=$ENABLE_PRICE_SCHEDULING \
+--queuePenaltyFactor=$QUEUE_PENALTY_FACTOR"
+
+echo "Running simulation with Price-Aware Scheduling: $ENABLE_PRICE_SCHEDULING"
+echo "Queue Penalty Factor: $QUEUE_PENALTY_FACTOR"
+echo ""
+
+./ns3 run "$CMD"
