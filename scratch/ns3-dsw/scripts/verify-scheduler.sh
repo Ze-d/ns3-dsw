@@ -11,7 +11,14 @@ echo "1. 运行对照组（不启用调度）..."
   --nodes=scratch/ns3-dsw/data/nodes.csv \
   --links=scratch/ns3-dsw/data/links.csv \
   --simDuration=5 \
-  --enablePriceAwareScheduling=0" 2>&1 | tail -5
+  --enablePriceAwareScheduling=0 \
+  --flowXml=scratch/ns3-dsw/out/flowmon.xml \
+  --statsCsv=scratch/ns3-dsw/out/flowstats.csv \
+  --animXml=scratch/ns3-dsw/out/topo_figure.xml \
+  --proSinkXml=scratch/ns3-dsw/out/pro_sink_stats.xml \
+  --nodeUtilXml=scratch/ns3-dsw/out/node_util.xml \
+  --linkUtilXml=scratch/ns3-dsw/out/link_util.xml \
+  --powerCostXmlBase=scratch/ns3-dsw/out/power_cost" 2>&1 | tail -5
 
 # 保存结果
 cp scratch/ns3-dsw/out/pro_sink_stats.xml /tmp/baseline.xml
@@ -22,7 +29,14 @@ echo "2. 运行实验组（启用调度）..."
   --nodes=scratch/ns3-dsw/data/nodes.csv \
   --links=scratch/ns3-dsw/data/links.csv \
   --simDuration=5 \
-  --enablePriceAwareScheduling=1" 2>&1 | tail -5
+  --enablePriceAwareScheduling=1 \
+  --flowXml=scratch/ns3-dsw/out/flowmon.xml \
+  --statsCsv=scratch/ns3-dsw/out/flowstats.csv \
+  --animXml=scratch/ns3-dsw/out/topo_figure.xml \
+  --proSinkXml=scratch/ns3-dsw/out/pro_sink_stats.xml \
+  --nodeUtilXml=scratch/ns3-dsw/out/node_util.xml \
+  --linkUtilXml=scratch/ns3-dsw/out/link_util.xml \
+  --powerCostXmlBase=scratch/ns3-dsw/out/power_cost" 2>&1 | tail -5
 
 # 保存结果
 cp scratch/ns3-dsw/out/pro_sink_stats.xml /tmp/with-scheduler.xml

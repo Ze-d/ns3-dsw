@@ -220,9 +220,9 @@ main(int argc, char* argv[])
     double warmupTime = 6.0;     // 仿真预热时间 (s) - [MODIFIED]
     double simDuration = 24.0;   // 实际仿真时间 (s, 1s=1h) - [MODIFIED]
     
-    std::string flowmonXml = "topo-figure.perlink.flowmon.xml";
-    std::string statsCsv = ""; // 若非空则导出 CSV 指标
-    std::string animXml = "topo-figure.xml";
+    std::string flowmonXml = "scratch/ns3-dsw/out/flowmon.xml";
+    std::string statsCsv = "scratch/ns3-dsw/out/flowstats.csv"; // 若非空则导出 CSV 指标
+    std::string animXml = "scratch/ns3-dsw/out/topo_figure.xml";
     std::string dotPath = ""; // 若非空导出 .dot
     double dotScale = 80.0;   // dot 坐标缩放
     bool enablePcap = false;
