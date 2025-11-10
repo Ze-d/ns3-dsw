@@ -111,9 +111,14 @@ private:
 
     uint16_t    m_port;
     uint32_t    m_taskSize;
-    uint32_t    m_packetSize; 
+    uint32_t    m_packetSize;
 
     std::map<std::pair<uint32_t, uint32_t>, uint32_t> m_currentRxBytesPerTask;
+
+    // --- 初始化状态跟踪 ---
+    bool        m_initialized;   // 是否已初始化（已调用StartApplication）
+    uint32_t    m_nodeId;        // 节点ID（延迟获取以避免空指针）
+    std::string m_powerCostXmlPath; // 功率成本XML文件路径（延迟打开）
 
     Time        m_simulationStep;
     uint32_t    m_tasksCompleted;
