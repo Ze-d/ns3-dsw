@@ -157,9 +157,11 @@ ApplicationManager::CreatePriceAwareScheduler(
     const std::map<uint32_t, NodeSpec>& nodeSpecMap,
     const std::vector<Address>& sinkAddresses,
     const std::vector<double>& priceProfile,
-    double queuePenaltyFactor)
+    double queuePenaltyFactor,
+    double loadDecayFactor)
 {
-    NS_LOG_FUNCTION(&nodeSpecMap << sinkAddresses.size() << priceProfile.size() << queuePenaltyFactor);
+    NS_LOG_FUNCTION(&nodeSpecMap << sinkAddresses.size() << priceProfile.size()
+                    << queuePenaltyFactor << loadDecayFactor);
 
     std::vector<ConsumerState> consumers;
 
@@ -201,9 +203,10 @@ ApplicationManager::CreatePriceAwareScheduler(
 
     // 创建调度器
     Ptr<PriceAwareScheduler> scheduler = CreateObject<PriceAwareScheduler>();
-    scheduler->Initialize(consumers, priceProfile, queuePenaltyFactor);
+    scheduler->Initialize(consumers, priceProfile, queuePenaltyFactor, loadDecayFactor);
 
-    NS_LOG_INFO("Created PriceAwareScheduler with " << consumers.size() << " consumers");
+    NS_LOG_INFO("Created PriceAwareScheduler with " << consumers.size()
+                << " consumers and load decay factor " << loadDecayFactor);
 
     return scheduler;
 }

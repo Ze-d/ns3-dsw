@@ -36,10 +36,12 @@ public:
      * @param consumers 消费者状态列表
      * @param priceProfile 电价曲线 (288个点，5分钟间隔)
      * @param queuePenaltyFactor 队列积压惩罚系数
+     * @param loadDecayFactor 负载衰减因子 (0.0-1.0，影响高负载下的处理速度)
      */
     void Initialize(const std::vector<ConsumerState>& consumers,
                     const std::vector<double>& priceProfile,
-                    double queuePenaltyFactor = 0.1);
+                    double queuePenaltyFactor = 0.1,
+                    double loadDecayFactor = 0.5);
 
     /**
      * @brief 调度下一个任务到最优消费者
@@ -91,6 +93,16 @@ public:
      */
     const std::vector<ConsumerState>& GetConsumers() const;
 
+    /**
+     * @brief 设置负载衰减因子
+     * @param factor 衰减因子 (0.0-1.0)
+     * @details
+     * 0.0: 固定处理速度（无衰减，方案1）
+     * 0.5: 50%衰减（中等衰减）
+     * 1.0: 100%衰减（高负载时处理速度大幅下降）
+     */
+    void SetLoadDecayFactor(double factor);
+
 private:
     /**
      * @brief 计算任务开始处理的时间
@@ -110,6 +122,7 @@ private:
     std::vector<ConsumerState> m_consumers;  // 消费者状态列表
     std::vector<double> m_priceProfile;      // 电价曲线
     double m_queuePenaltyFactor;             // 队列积压惩罚系数
+    double m_loadDecayFactor;                // 负载衰减因子
     bool m_initialized;                      // 初始化标志
 };
 

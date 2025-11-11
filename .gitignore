@@ -55,6 +55,7 @@ cmake-build-release/
 .cache/
 
 CLAUDE.md
+WORK.md
 
 # Simulation output files
 scratch/ns3-dsw/out/

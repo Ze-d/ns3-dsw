@@ -129,15 +129,17 @@ MySink::MySink()
       m_tasksPerSecond(1000.0),
       m_processingCredit(0.0),
       m_running(false),
-       m_updateInterval(Seconds(0.25)), // 默认更新间隔为 0.25 秒
-       m_totalTimeInInterval(Time(0)),
-       m_idleTimeInInterval(Time(0)),
-       m_powerCouplingEnabled(false),
-       m_warmupTime(0.0),
-       m_basePower(0.0),
-       m_fullPower(0.0),
-       m_pricePhaseOffsetHours(0.0),
-       m_totalAccumulatedCost(0.0)
+      m_updateInterval(Seconds(0.25)), // 默认更新间隔为 0.25 秒
+      m_totalTimeInInterval(Time(0)),
+      m_idleTimeInInterval(Time(0)),
+      m_powerCouplingEnabled(false),
+      m_warmupTime(0.0),
+      m_basePower(0.0),
+      m_fullPower(0.0),
+      m_pricePhaseOffsetHours(0.0),
+      m_totalAccumulatedCost(0.0),
+      m_initialized(false),
+      m_nodeId(0)
 {
 }
 
@@ -157,6 +159,7 @@ MySink::~MySink()
 void
 MySink::Setup(uint32_t nodeId, double tasksPerSecond, Time simulationStep, Time updateInterval)
 {
+    m_nodeId = nodeId; // 保存nodeId，但不要立即使用GetNode()
     m_tasksPerSecond = tasksPerSecond;
     m_simulationStep = simulationStep;
     m_updateInterval = updateInterval;
@@ -165,8 +168,8 @@ MySink::Setup(uint32_t nodeId, double tasksPerSecond, Time simulationStep, Time 
 
 void
 MySink::Setup(uint32_t nodeId,
-              double tasksPerSecond, 
-              Time simulationStep, 
+              double tasksPerSecond,
+              Time simulationStep,
               Time updateInterval,
               double warmupTime,
               double basePower,
@@ -175,6 +178,8 @@ MySink::Setup(uint32_t nodeId,
               const std::vector<double>& priceProfile,
               const std::string& powerCostXmlPath)
 {
+    m_nodeId = nodeId; // 保存nodeId，但不要立即使用GetNode()
+
     // 1. Set basic params
     m_tasksPerSecond = tasksPerSecond;
     m_simulationStep = simulationStep;
@@ -187,30 +192,18 @@ MySink::Setup(uint32_t nodeId,
     m_pricePhaseOffsetHours = phaseOffset;
     m_priceProfile = priceProfile;
     m_powerCouplingEnabled = true; // 显式开启
-    
-    // 3. Open XML file
-    m_powerCostXmlFile.open(powerCostXmlPath.c_str());
-    if (m_powerCostXmlFile.is_open())
-    {
-        m_powerCostXmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
-        m_powerCostXmlFile << "<PowerCostStats nodeId=\"" << nodeId
-                           << "\" basePowerMW=\"" << m_basePower
-                           << "\" fullPowerMW=\"" << m_fullPower
-                           << "\" phaseOffsetHours=\"" << m_pricePhaseOffsetHours
-                           << "\" updateIntervalS=\"" << m_updateInterval.GetSeconds()
-                           << "\">" << std::endl;
-        m_powerCostXmlFile << std::fixed << std::setprecision(6);
-    }
-    else
-    {
-        NS_LOG_ERROR("MySink (Node " << GetNode()->GetId() << "): Failed to open power cost XML file: " << powerCostXmlPath);
-        m_powerCouplingEnabled = false; // Open failed, disable
-    }
+
+    // 3. Open XML file (延迟到StartApplication中，因为此时还没有GetNode())
+    // 注意：我们现在不打开文件，而是在StartApplication中打开
+    m_powerCostXmlPath = powerCostXmlPath;
 }
 
 void
 MySink::StartApplication()
 {
+    // 标记为已初始化，现在可以安全使用GetNode()
+    m_initialized = true;
+
     if (m_listenSocket == nullptr)
     {
         // 使用 TcpSocketFactory
@@ -226,22 +219,42 @@ MySink::StartApplication()
             NS_FATAL_ERROR("Failed to listen on socket");
         }
     }
-    
+
     // 设置接受连接的回调
     m_listenSocket->SetAcceptCallback(MakeCallback(&MySink::HandleAccept, this),
                                     MakeCallback(&MySink::HandleNewConnection, this));
-    
+
+    // 现在可以安全地打开XML文件和使用GetNode()
     if (m_powerCouplingEnabled)
     {
-        NS_LOG_INFO("MySink (Node " << GetNode()->GetId() << "): Power coupling ENABLED.");
+        // 打开XML文件
+        m_powerCostXmlFile.open(m_powerCostXmlPath.c_str());
+        if (m_powerCostXmlFile.is_open())
+        {
+            m_powerCostXmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
+            m_powerCostXmlFile << "<PowerCostStats nodeId=\"" << m_nodeId
+                               << "\" basePowerMW=\"" << m_basePower
+                               << "\" fullPowerMW=\"" << m_fullPower
+                               << "\" phaseOffsetHours=\"" << m_pricePhaseOffsetHours
+                               << "\" updateIntervalS=\"" << m_updateInterval.GetSeconds()
+                               << "\">" << std::endl;
+            m_powerCostXmlFile << std::fixed << std::setprecision(6);
+        }
+        else
+        {
+            NS_LOG_ERROR("MySink (Node " << m_nodeId << "): Failed to open power cost XML file: " << m_powerCostXmlPath);
+            m_powerCouplingEnabled = false; // Open failed, disable
+        }
+
+        NS_LOG_INFO("MySink (Node " << m_nodeId << "): Power coupling ENABLED.");
         if (m_priceProfile.empty())
         {
-             NS_FATAL_ERROR("MySink (Node " << GetNode()->GetId() << "): Power coupling enabled but price profile is empty. Check main setup.");
+             NS_FATAL_ERROR("MySink (Node " << m_nodeId << "): Power coupling enabled but price profile is empty. Check main setup.");
         }
     }
     else
     {
-        NS_LOG_INFO("MySink (Node " << GetNode()->GetId() << "): Power coupling DISABLED.");
+        NS_LOG_INFO("MySink (Node " << m_nodeId << "): Power coupling DISABLED.");
     }
 
     m_running = true;
@@ -261,16 +274,16 @@ MySink::StopApplication()
                                           Callback<void, Ptr<Socket>, const Address&>());
         m_listenSocket->Close();
     }
-    
-    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() 
-                  << "]: 停止处理新任务。总共处理任务数: " << m_tasksCompleted 
+
+    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
+                  << "]: 停止处理新任务。总共处理任务数: " << m_tasksCompleted
                   << ". 队列中剩余任务数: " << m_taskQueue.size());
 
     if (m_powerCouplingEnabled)
     {
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() 
+        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
                       << "]: 累积总成本: $" << std::fixed << std::setprecision(2) << m_totalAccumulatedCost);
-    
+
         if (m_powerCostXmlFile.is_open())
         {
             m_powerCostXmlFile << "</PowerCostStats>" << std::endl;
@@ -383,8 +396,8 @@ MySink::ProcessSocketBuffer(Ptr<Socket> socket)
         if (m_currentRxBytesPerTask[taskKey] >= m_taskSize)
         {
             m_taskQueue.push(taskKey);
-            NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 任务 " 
-                          << taskKey.first << "-" << taskKey.second << " 完整接收并入列，队列共有" 
+            NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 任务 "
+                          << taskKey.first << "-" << taskKey.second << " 完整接收并入列，队列共有"
                           << m_taskQueue.size() << "个任务等待处理。");
 
             m_currentRxBytesPerTask.erase(taskKey);
@@ -401,22 +414,22 @@ MySink::ProcessTasks()
      // --- 1. 算力利用率跟踪 (高精度轮询) ---
      // 累加总时间 (以 simulationStep 为单位)
      m_totalTimeInInterval += m_simulationStep;
- 
+
      // 检查队列状态
      if (m_taskQueue.empty())
      {
          // 队列为空：累加空闲时间，不累积处理信用点
          m_idleTimeInInterval += m_simulationStep;
-         
+
          //在队列为空时清除任何剩余的 < 1.0 的信用点：
-         m_processingCredit = 0.0; 
+         m_processingCredit = 0.0;
      }
      else
      {
          // 队列非空：不累加空闲时间，但累积处理信用点
          m_processingCredit += m_tasksPerSecond * m_simulationStep.GetSeconds();
      }
- 
+
      // --- 2. 现有任务处理逻辑 ---
     uint32_t tasksToProcess = floor(m_processingCredit);
     for (uint32_t i = 0; i < tasksToProcess && !m_taskQueue.empty(); ++i)
@@ -425,13 +438,13 @@ MySink::ProcessTasks()
         m_taskQueue.pop();
         m_tasksCompleted++;
         m_processingCredit -= 1.0;
-        
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 任务 " 
-                      << taskKey.first << "-" << taskKey.second << " 处理完成，队列共有" 
-                      << m_taskQueue.size() << "个任务等待处理。消费者 " 
-                      << GetNode()->GetId() << " 处理总数 " << m_tasksCompleted << "。");
-        
-        m_taskCompletedTrace(GetNode()->GetId(), taskKey.first, taskKey.second, m_tasksCompleted);
+
+        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 任务 "
+                      << taskKey.first << "-" << taskKey.second << " 处理完成，队列共有"
+                      << m_taskQueue.size() << "个任务等待处理。消费者 "
+                      << m_nodeId << " 处理总数 " << m_tasksCompleted << ".");
+
+        m_taskCompletedTrace(m_nodeId, taskKey.first, taskKey.second, m_tasksCompleted);
     }
     if (m_running)
     {
@@ -504,31 +517,31 @@ MySink::ReportUtilization()
     }
 
     // 3. 触发 Utilization Trace
-    m_utilizationTrace(GetNode()->GetId(), utilization);
+    m_utilizationTrace(m_nodeId, utilization);
 
     // 3.1 触发队列长度 Trace
-    m_queueLengthTrace(GetNode()->GetId(), m_taskQueue.size());
+    m_queueLengthTrace(m_nodeId, m_taskQueue.size());
 
     // --- 4. (Guarded) 计算功率、电价和成本 ---
     if (m_powerCouplingEnabled)
     {
         // 功率 (MW) = 基础功率 + (满载功率 - 基础功率) * 利用率
         double avgPower_MW = m_basePower + utilization * (m_fullPower - m_basePower);
-        
+
         // 获取当前电价
         uint32_t priceIndex = GetCurrentPriceIndex();
         double currentPrice_per_MWh = m_priceProfile[priceIndex];
-        
+
         // 计算此间隔的成本
         double intervalHours = m_updateInterval.GetSeconds() / 3600.0;
         double intervalEnergy_MWh = avgPower_MW * intervalHours;
         double intervalCost = intervalEnergy_MWh * currentPrice_per_MWh;
-        
+
         // 累积总成本
         m_totalAccumulatedCost += intervalCost;
 
         // 5. 打印控制台日志 (扩展)
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() 
+        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
                       << "]: Util: " << std::fixed << std::setprecision(2) << utilization * 100.0 << "%"
                       << " | AvgPower: " << std::setprecision(3) << avgPower_MW << " MW"
                       << " | Price: $" << std::setprecision(2) << currentPrice_per_MWh << "/MWh"
@@ -549,7 +562,7 @@ MySink::ReportUtilization()
     }
     else
     {
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << GetNode()->GetId() << "]: 算力利用率 (过去 " 
+        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 算力利用率 (过去 "
                       << m_updateInterval.GetSeconds() << "s): " << std::fixed << std::setprecision(2) << utilization * 100.0 << "%");
     }
 

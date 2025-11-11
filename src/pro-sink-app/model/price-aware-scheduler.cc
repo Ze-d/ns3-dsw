@@ -18,6 +18,7 @@ TypeId PriceAwareScheduler::GetTypeId(void)
 
 PriceAwareScheduler::PriceAwareScheduler()
     : m_queuePenaltyFactor(0.1),
+      m_loadDecayFactor(0.5),
       m_initialized(false)
 {
     NS_LOG_FUNCTION(this);
@@ -30,17 +31,20 @@ PriceAwareScheduler::~PriceAwareScheduler()
 
 void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers,
                                      const std::vector<double>& priceProfile,
-                                     double queuePenaltyFactor)
+                                     double queuePenaltyFactor,
+                                     double loadDecayFactor)
 {
-    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor);
+    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor);
 
     m_consumers = consumers;
     m_priceProfile = priceProfile;
     m_queuePenaltyFactor = queuePenaltyFactor;
+    m_loadDecayFactor = loadDecayFactor;
     m_initialized = true;
 
     NS_LOG_INFO("PriceAwareScheduler initialized with " << m_consumers.size()
-              << " consumers and " << m_priceProfile.size() << " price points.");
+              << " consumers, " << m_priceProfile.size() << " price points, "
+              << "load decay factor " << loadDecayFactor << ".");
 }
 
 Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime)
@@ -167,9 +171,8 @@ double PriceAwareScheduler::CalculateTaskStartTime(const ConsumerState& consumer
 double PriceAwareScheduler::CalculateProcessingTime(const ConsumerState& consumer) const
 {
     // 处理时间 = 1 / 任务处理速度
-    // 注意：这里假设consumer.tasksPerSecond是实际处理速度
-    // 如果利用率为100%，则实际处理速度 = tasksPerSecond
-    // 如果利用率较低，实际处理速度会下降
+    // 注意：这里假设consumer.tasksPerSecond是理论最大处理速度
+    // m_loadDecayFactor控制高负载时的性能衰减程度
 
     if (consumer.tasksPerSecond <= 0.0)
     {
@@ -178,10 +181,16 @@ double PriceAwareScheduler::CalculateProcessingTime(const ConsumerState& consume
         return 1.0; // 默认1秒
     }
 
-    // 考虑当前利用率对处理速度的影响
-    // 利用率越高，处理速度越接近理论值
-    double effectiveRate = consumer.tasksPerSecond * (1.0 + consumer.currentUtilization);
-    effectiveRate = std::max(effectiveRate, consumer.tasksPerSecond * 0.1); // 最低10%速度
+    // 考虑当前负载对处理速度的影响
+    // 负载衰减模型：effectiveRate = tasksPerSecond * (1.0 - utilization * loadDecayFactor)
+    // - loadDecayFactor = 0.0: 固定处理速度（无衰减）
+    // - loadDecayFactor = 0.5: 中等衰减（50%）
+    // - loadDecayFactor = 1.0: 完全衰减（高负载时速度大幅下降）
+    double loadFactor = std::min(consumer.currentUtilization, 1.0);
+    double effectiveRate = consumer.tasksPerSecond * (1.0 - loadFactor * m_loadDecayFactor);
+
+    // 保证最低处理速度为理论速度的10%
+    effectiveRate = std::max(effectiveRate, consumer.tasksPerSecond * 0.1);
 
     return 1.0 / effectiveRate;
 }
@@ -213,6 +222,13 @@ void PriceAwareScheduler::SetQueuePenaltyFactor(double factor)
 {
     NS_LOG_FUNCTION(this << factor);
     m_queuePenaltyFactor = factor;
+}
+
+void PriceAwareScheduler::SetLoadDecayFactor(double factor)
+{
+    NS_LOG_FUNCTION(this << factor);
+    m_loadDecayFactor = factor;
+    NS_LOG_INFO("Load decay factor set to " << m_loadDecayFactor);
 }
 
 const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const

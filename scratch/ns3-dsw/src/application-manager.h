@@ -51,13 +51,15 @@ public:
      * @param sinkAddresses 消费者地址列表
      * @param priceProfile 电价曲线
      * @param queuePenaltyFactor 队列惩罚系数
+     * @param loadDecayFactor 负载衰减因子
      * @return 调度器实例
      */
     static Ptr<PriceAwareScheduler> CreatePriceAwareScheduler(
         const std::map<uint32_t, NodeSpec>& nodeSpecMap,
         const std::vector<Address>& sinkAddresses,
         const std::vector<double>& priceProfile,
-        double queuePenaltyFactor = 0.1);
+        double queuePenaltyFactor = 0.1,
+        double loadDecayFactor = 0.5);
 
 private:
     // 禁用拷贝构造和赋值
