@@ -253,6 +253,7 @@ main(int argc, char* argv[])
     // --- 价格感知调度参数 ---
     bool enablePriceAwareScheduling = false; // 默认关闭
     double queuePenaltyFactor = 0.1; // 队列积压惩罚系数
+    double loadDecayFactor = 0.5; // 负载衰减因子 (0.0=无衰减, 1.0=完全衰减)
     // --- End MODIFICATION ---
 
     CommandLine cmd;
@@ -294,6 +295,7 @@ main(int argc, char* argv[])
     // --- 价格感知调度命令行参数 ---
     cmd.AddValue("enablePriceAwareScheduling", "Enable Price-Aware Task Scheduling (0/1)", enablePriceAwareScheduling);
     cmd.AddValue("queuePenaltyFactor", "Queue penalty factor for price-aware scheduling", queuePenaltyFactor);
+    cmd.AddValue("loadDecayFactor", "Load decay factor for price-aware scheduling (0.0-1.0)", loadDecayFactor);
 
     cmd.Parse(argc, argv);
     VisualizationConfig::SetupLogging(logLevel);
@@ -320,11 +322,12 @@ main(int argc, char* argv[])
     // --- TCP Pacing ---
 
     // 确保 XML 输出在 scratch/ns3-dsw/out/ 目录下
-    if (proSinkXmlFile.rfind("scratch/ns3-dsw/out/", 0) != 0)
+    // 检查路径是否已经包含 scratch/ns3-dsw/out/ 前缀
+    if (proSinkXmlFile.find("scratch/ns3-dsw/out/") == std::string::npos)
     {
         proSinkXmlFile = "scratch/ns3-dsw/out/" + proSinkXmlFile;
     }
-    if (nodeUtilXmlFile.rfind("scratch/ns3-dsw/out/", 0) != 0)
+    if (nodeUtilXmlFile.find("scratch/ns3-dsw/out/") == std::string::npos)
     {
         nodeUtilXmlFile = "scratch/ns3-dsw/out/" + nodeUtilXmlFile;
     }
@@ -495,9 +498,9 @@ main(int argc, char* argv[])
     {
         NS_LOG_INFO("Creating PriceAwareScheduler...");
         scheduler = ApplicationManager::CreatePriceAwareScheduler(
-            nodeSpecMap, sinkAddresses, priceProfile, queuePenaltyFactor);
+            nodeSpecMap, sinkAddresses, priceProfile, queuePenaltyFactor, loadDecayFactor);
         g_scheduler = scheduler; // 设置全局变量
-        NS_LOG_INFO("PriceAwareScheduler created successfully.");
+        NS_LOG_INFO("PriceAwareScheduler created successfully with load decay factor " << loadDecayFactor);
     }
 
     // 使用 ApplicationManager 安装所有应用
@@ -506,7 +509,6 @@ main(int argc, char* argv[])
         powerCostXmlBase, proAppStartTime, proAppStopTime, simulationStep,
         proAppUpdateInterval, proTaskSize, proPacketSize, warmupTime);
 
-    ApplicationContainer& proApps = installResult.apps;
     std::vector<Ptr<MyProducer>>& producers = installResult.producers;
     std::vector<Ptr<MySink>>& sinks = installResult.sinks;
 
