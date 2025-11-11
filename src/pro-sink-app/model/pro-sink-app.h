@@ -202,12 +202,13 @@ private:
     Ptr<ExponentialRandomVariable> m_interTaskTimeGenerator;
     std::queue<bool> m_taskQueue;
 
+    bool m_running;
+    bool m_connected;
+
     // --- 价格感知调度 ---
     bool m_enablePriceAwareScheduling;  // 是否启用价格感知调度
     Ptr<PriceAwareScheduler> m_scheduler;  // 调度器实例
 
-    bool m_running;
-    bool m_connected;
 };
 
 } // namespace ns3

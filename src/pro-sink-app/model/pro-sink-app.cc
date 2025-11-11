@@ -124,6 +124,10 @@ MySink::MySink()
       m_port(8080),
       m_taskSize(256 * 1024),
       m_packetSize(1024), // 必须与 Producer 匹配
+      m_currentRxBytesPerTask(),
+      m_initialized(false),
+      m_nodeId(0),
+      m_powerCostXmlPath(),
       m_simulationStep(MilliSeconds(1)),
       m_tasksCompleted(0),
       m_tasksPerSecond(1000.0),
@@ -137,9 +141,7 @@ MySink::MySink()
       m_basePower(0.0),
       m_fullPower(0.0),
       m_pricePhaseOffsetHours(0.0),
-      m_totalAccumulatedCost(0.0),
-      m_initialized(false),
-      m_nodeId(0)
+      m_totalAccumulatedCost(0.0)
 {
 }
 
@@ -611,6 +613,7 @@ MyProducer::MyProducer()
       m_simulationStep(MilliSeconds(1)),
       m_lambda(0.0),
       m_interTaskTimeGenerator(nullptr),
+      m_taskQueue(),
       m_running(false),
       m_connected(false),
       m_enablePriceAwareScheduling(false),
