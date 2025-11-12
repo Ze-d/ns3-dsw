@@ -26,6 +26,31 @@ class PriceAwareScheduler;
 
 namespace ns3 {
 
+// --- UDP探测包头 ---
+class ProbeHeader : public Header
+{
+public:
+    static TypeId GetTypeId(void);
+    virtual TypeId GetInstanceTypeId(void) const;
+    virtual uint32_t GetSerializedSize(void) const;
+    virtual void Serialize(Buffer::Iterator start) const;
+    virtual uint32_t Deserialize(Buffer::Iterator start);
+    virtual void Print(std::ostream &os) const;
+
+    ProbeHeader();
+    ~ProbeHeader();
+
+    void SetTimestamp(Time timestamp);
+    Time GetTimestamp() const;
+
+private:
+    Time m_timestamp;
+};
+
+} // namespace ns3
+
+namespace ns3 {
+
 // --- 0. 自定义包头 (TaskHeader) 声明 ---
 class TaskHeader : public Header
 {
@@ -97,13 +122,19 @@ private:
     void HandleErrorClose(Ptr<Socket> socket);
     void ProcessSocketBuffer(Ptr<Socket> socket);
 
+    // --- UDP探测响应 ---
+    void HandleProbeReceive(Ptr<Socket> socket);
+
     // --- 任务处理 ---
     void ProcessTasks();
-    
+
     // --- 算力统计 & 功率/成本计算 ---
     void ReportUtilization();
     uint32_t GetCurrentPriceIndex() const;
 
+
+    Ptr<Socket> m_udpListenSocket;  // UDP探测套接字
+    static constexpr uint16_t PROBE_PORT = 8081;  // UDP探测端口
 
     Ptr<Socket> m_listenSocket; 
     std::list<Ptr<Socket>> m_acceptedSockets; 
@@ -167,6 +198,27 @@ public:
      */
     void SetScheduler(Ptr<PriceAwareScheduler> scheduler);
 
+    /**
+     * @brief 获取待发送队列中的任务数（pending）
+     */
+    uint32_t GetPendingTasks() const;
+
+    /**
+     * @brief 获取已发送的任务总数
+     */
+    uint32_t GetTotalTasksSent() const;
+
+    /**
+     * @brief 获取已生成的任务总数
+     */
+    uint32_t GetTotalTasksGenerated() const;
+
+    /**
+     * @brief 设置消费者地址列表（用于UDP探测）
+     * @param sinkAddresses 所有已知消费者的地址列表
+     */
+    void SetConsumerAddresses(const std::vector<Address>& sinkAddresses);
+
     TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
 
 private:
@@ -185,6 +237,17 @@ private:
     void SendNextTask();
     void GenerateTasks();
 
+    // --- TTTT测量 ---
+    void ReportTTTT(Address consumerAddress, Time tttt);
+    Time m_taskStartTime;  // 当前任务开始时间
+
+    // --- RTT探测 ---
+    void SendRTTProbe();
+    void HandleRTTProbeReceive(Ptr<Socket> socket);
+
+    Ptr<Socket> m_udpSocket;  // UDP探测套接字
+    std::vector<Address> m_consumerAddresses;  // 所有已知消费者地址
+
     Ptr<Socket> m_socket;
     Address     m_peerAddress; // 单个对端
     
@@ -192,6 +255,7 @@ private:
     uint32_t    m_packetSize;
     uint64_t    m_totalBytesSentForCurrentTask; // 使用字节数跟踪 TCP 流
     uint32_t    m_totalTasksSent;
+    uint32_t    m_totalTasksGenerated;  // 跟踪生成的总任务数
     bool        m_isSending;
 
     uint32_t    m_currentSendingProducerId;
@@ -202,12 +266,13 @@ private:
     Ptr<ExponentialRandomVariable> m_interTaskTimeGenerator;
     std::queue<bool> m_taskQueue;
 
+    bool m_running;
+    bool m_connected;
+
     // --- 价格感知调度 ---
     bool m_enablePriceAwareScheduling;  // 是否启用价格感知调度
     Ptr<PriceAwareScheduler> m_scheduler;  // 调度器实例
 
-    bool m_running;
-    bool m_connected;
 };
 
 } // namespace ns3

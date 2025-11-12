@@ -6,6 +6,7 @@
 #include "ns3/callback.h"
 #include <vector>
 #include <map>
+#include <fstream>
 
 namespace ns3 {
 
@@ -103,6 +104,40 @@ public:
      */
     void SetLoadDecayFactor(double factor);
 
+    /**
+     * @brief 报告TTTT测量结果
+     * @param consumerAddress 消费者地址
+     * @param tttt TTTT测量值
+     */
+    void ReportTTTTMeasured(Address consumerAddress, Time tttt);
+
+    /**
+     * @brief 报告RTT测量结果
+     * @param consumerAddress 消费者地址
+     * @param rtt RTT测量值
+     */
+    void ReportRTTMeasured(Address consumerAddress, Time rtt);
+
+    /**
+     * @brief 记录调度事件到XML文件
+     * @param producerNodeId 生产者节点ID
+     * @param taskArrivalTime 任务到达时间
+     * @param currentAddress 当前连接地址
+     * @param newAddress 新目标地址
+     * @param currentCost 当前成本
+     * @param switchCost 切换成本
+     * @param threshold 切换阈值
+     * @param decision 决策结果
+     */
+    void LogSchedulingEvent(uint32_t producerNodeId,
+                            double taskArrivalTime,
+                            Address currentAddress,
+                            Address newAddress,
+                            CostMetrics currentCost,
+                            CostMetrics switchCost,
+                            double threshold,
+                            const std::string& decision);
+
 private:
     /**
      * @brief 计算任务开始处理的时间
@@ -111,6 +146,20 @@ private:
      * @return 任务开始时间
      */
     double CalculateTaskStartTime(const ConsumerState& consumer, double currentTime) const;
+
+    /**
+     * @brief 预测TTTT（总任务传输时间）
+     * @param consumer 消费者状态
+     * @return 预测的TTTT值
+     *
+     * @details
+     * 根据数据新鲜度决定使用实测值或估算值：
+     * - 如果TTTT数据新鲜（< TTTT_FRESHNESS_THRESHOLD），使用实测值
+     * - 否则使用 RTT * K-Factor 估算
+     */
+    Time PredictTTTT(const ConsumerState& consumer) const;
+
+    static constexpr double TTTT_FRESHNESS_THRESHOLD = 0.25; // 数据新鲜度阈值（秒）
 
     /**
      * @brief 计算处理时间
@@ -124,6 +173,9 @@ private:
     double m_queuePenaltyFactor;             // 队列积压惩罚系数
     double m_loadDecayFactor;                // 负载衰减因子
     bool m_initialized;                      // 初始化标志
+
+    // XML记录相关
+    std::ofstream m_xmlLogFile;              // 调度事件XML日志文件
 };
 
 } // namespace ns3

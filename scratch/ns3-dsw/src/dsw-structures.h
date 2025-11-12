@@ -12,6 +12,7 @@
 #include "ns3/data-rate.h"
 #include "ns3/net-device.h"
 #include "ns3/address.h"
+#include "ns3/nstime.h"
 
 namespace ns3 {
 
@@ -40,6 +41,12 @@ struct ConsumerState
     uint32_t currentQueueLength = 0;  // 当前队列长度 (待处理任务数)
     double basePower = 0.0;           // 基础功率 (MW)
     double fullPower = 0.0;           // 满载功率 (MW)
+
+    // --- TTTT/RTT/K-Factor 动态调度相关 ---
+    Time m_lastMeasuredTTTT;          // 上次测量的TTTT
+    Time m_lastMeasuredRTT;           // 上次测量的RTT
+    Time m_lastTTTTTimestamp;         // 上次TTTT测量的时间戳
+    double m_K_factor = 1.0;          // K-Factor = TTTT / RTT
 };
 
 /**

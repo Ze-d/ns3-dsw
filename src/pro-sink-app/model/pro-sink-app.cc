@@ -12,7 +12,64 @@
 
 namespace ns3 {
 
-NS_LOG_COMPONENT_DEFINE("ProSinkApp"); 
+NS_LOG_COMPONENT_DEFINE("ProSinkApp");
+
+// --- ProbeHeader 实现 ---
+
+TypeId ProbeHeader::GetTypeId(void)
+{
+    static TypeId tid = TypeId("ns3::ProbeHeader")
+        .SetParent<Header>()
+        .SetGroupName("Applications")
+        .AddConstructor<ProbeHeader>();
+    return tid;
+}
+
+TypeId ProbeHeader::GetInstanceTypeId(void) const
+{
+    return GetTypeId();
+}
+
+uint32_t ProbeHeader::GetSerializedSize(void) const
+{
+    // 存储Time需要8字节（double）
+    return sizeof(double);
+}
+
+void ProbeHeader::Serialize(Buffer::Iterator start) const
+{
+    start.WriteHtonU64(m_timestamp.GetDouble());
+}
+
+uint32_t ProbeHeader::Deserialize(Buffer::Iterator start)
+{
+    m_timestamp = Time::FromDouble(start.ReadNtohU64(), Time::S);
+    return GetSerializedSize();
+}
+
+void ProbeHeader::Print(std::ostream &os) const
+{
+    os << "Timestamp=" << m_timestamp.GetSeconds() << "s";
+}
+
+ProbeHeader::ProbeHeader()
+    : m_timestamp(Time(0))
+{
+}
+
+ProbeHeader::~ProbeHeader()
+{
+}
+
+void ProbeHeader::SetTimestamp(Time timestamp)
+{
+    m_timestamp = timestamp;
+}
+
+Time ProbeHeader::GetTimestamp() const
+{
+    return m_timestamp;
+} 
 
 // --- 0. TaskHeader 实现 ---
 
@@ -120,10 +177,15 @@ TypeId MySink::GetTypeId(void)
 }
 
 MySink::MySink()
-    : m_listenSocket(nullptr),
+    : m_udpListenSocket(nullptr),
+      m_listenSocket(nullptr),
       m_port(8080),
       m_taskSize(256 * 1024),
       m_packetSize(1024), // 必须与 Producer 匹配
+      m_currentRxBytesPerTask(),
+      m_initialized(false),
+      m_nodeId(0),
+      m_powerCostXmlPath(),
       m_simulationStep(MilliSeconds(1)),
       m_tasksCompleted(0),
       m_tasksPerSecond(1000.0),
@@ -137,9 +199,7 @@ MySink::MySink()
       m_basePower(0.0),
       m_fullPower(0.0),
       m_pricePhaseOffsetHours(0.0),
-      m_totalAccumulatedCost(0.0),
-      m_initialized(false),
-      m_nodeId(0)
+      m_totalAccumulatedCost(0.0)
 {
 }
 
@@ -204,6 +264,17 @@ MySink::StartApplication()
     // 标记为已初始化，现在可以安全使用GetNode()
     m_initialized = true;
 
+    // 创建UDP套接字用于响应RTT探测
+    TypeId udpTid = TypeId::LookupByName("ns3::UdpSocketFactory");
+    m_udpListenSocket = Socket::CreateSocket(GetNode(), udpTid);
+    InetSocketAddress udpLocal = InetSocketAddress(Ipv4Address::GetAny(), PROBE_PORT);
+    if (m_udpListenSocket->Bind(udpLocal) == -1)
+    {
+        NS_FATAL_ERROR("Failed to bind UDP socket for probe response");
+    }
+    m_udpListenSocket->SetRecvCallback(MakeCallback(&MySink::HandleProbeReceive, this));
+    NS_LOG_INFO("MySink (Node " << m_nodeId << "): UDP probe listener created on port " << PROBE_PORT);
+
     if (m_listenSocket == nullptr)
     {
         // 使用 TcpSocketFactory
@@ -266,6 +337,13 @@ void
 MySink::StopApplication()
 {
     m_running = false;
+
+    // 关闭UDP套接字
+    if (m_udpListenSocket != nullptr)
+    {
+        m_udpListenSocket->SetRecvCallback(Callback<void, Ptr<Socket>>());
+        m_udpListenSocket->Close();
+    }
 
     // 关闭监听套字
     if (m_listenSocket != nullptr)
@@ -600,17 +678,22 @@ TypeId MyProducer::GetTypeId(void)
 }
 
 MyProducer::MyProducer()
-    : m_socket(nullptr),
+    : m_taskStartTime(Time(0)),
+      m_udpSocket(nullptr),
+      m_consumerAddresses(),
+      m_socket(nullptr),
       m_taskSize(256 * 1024),
       m_packetSize(1024),
       m_totalBytesSentForCurrentTask(0),
       m_totalTasksSent(0),
+      m_totalTasksGenerated(0),
       m_isSending(false),
       m_currentSendingProducerId(0),
       m_currentSendingTaskId(0),
       m_simulationStep(MilliSeconds(1)),
       m_lambda(0.0),
       m_interTaskTimeGenerator(nullptr),
+      m_taskQueue(),
       m_running(false),
       m_connected(false),
       m_enablePriceAwareScheduling(false),
@@ -651,14 +734,59 @@ MyProducer::SetScheduler(Ptr<PriceAwareScheduler> scheduler)
     NS_LOG_INFO("Scheduler set for producer on node " << GetNode()->GetId());
 }
 
+uint32_t
+MyProducer::GetPendingTasks() const
+{
+    return m_taskQueue.size();
+}
+
+uint32_t
+MyProducer::GetTotalTasksSent() const
+{
+    return m_totalTasksSent;
+}
+
+uint32_t
+MyProducer::GetTotalTasksGenerated() const
+{
+    return m_totalTasksGenerated;
+}
+
+void
+MyProducer::SetConsumerAddresses(const std::vector<Address>& sinkAddresses)
+{
+    NS_LOG_FUNCTION(this << sinkAddresses.size());
+    m_consumerAddresses = sinkAddresses;
+}
+
 void
 MyProducer::StartApplication()
 {
+    // 创建UDP套接字用于RTT探测
+    if (!m_consumerAddresses.empty())
+    {
+        TypeId udpTid = TypeId::LookupByName("ns3::UdpSocketFactory");
+        m_udpSocket = Socket::CreateSocket(GetNode(), udpTid);
+        m_udpSocket->SetRecvCallback(MakeCallback(&MyProducer::HandleRTTProbeReceive, this));
+
+        // 绑定到任意端口
+        InetSocketAddress udpLocal = InetSocketAddress(Ipv4Address::GetAny(), 0);
+        if (m_udpSocket->Bind(udpLocal) == -1)
+        {
+            NS_FATAL_ERROR("Failed to bind UDP socket for RTT probes");
+        }
+
+        NS_LOG_INFO("RTT probe UDP socket created for producer on node " << GetNode()->GetId());
+
+        // 启动RTT探测（每10秒）
+        Simulator::Schedule(Seconds(10.0), &MyProducer::SendRTTProbe, this);
+    }
+
     // 使用 TcpSocketFactory
     // 注意：Pacing 必须在运行此文件的脚本中通过 Config::SetDefault 启用
     TypeId tid = TypeId::LookupByName("ns3::TcpSocketFactory");
     m_socket = Socket::CreateSocket(GetNode(), tid);
-    
+
     m_socket->SetConnectCallback(MakeCallback(&MyProducer::ConnectionSucceeded, this),
                                  MakeCallback(&MyProducer::ConnectionFailed, this));
     m_socket->SetSendCallback(MakeCallback(&MyProducer::HandleSend, this));
@@ -762,6 +890,7 @@ MyProducer::GenerateTasks()
         {
             m_taskQueue.push(true);
         }
+        m_totalTasksGenerated += numTasksToGenerate;  // 累计生成任务数
         if (!m_isSending)
         {
             SendNextTask(); // 尝试启动发送
@@ -817,7 +946,158 @@ MyProducer::SendNextTask()
         return; // 等待连接成功
     }
 
-    // 如果已连接，继续发送
+    // 已连接状态下的动态决策
+    if (m_enablePriceAwareScheduling && m_scheduler)
+    {
+        double nowSeconds = Simulator::Now().GetSeconds();
+
+        // 计算当前目标的成本（Cost_Stay）
+        // 注意：这里需要获取消费者列表来计算成本
+        // 简化实现：直接询问调度器最优目标，然后与当前目标比较
+
+        // 获取所有消费者列表
+        const std::vector<ConsumerState>& consumers = m_scheduler->GetConsumers();
+
+        // 计算当前目标的成本
+        CostMetrics currentCost = {0};
+        for (const auto& consumer : consumers)
+        {
+            if (consumer.sinkAddress == m_peerAddress)
+            {
+                currentCost = m_scheduler->CalculateCost(consumer, nowSeconds);
+                break;
+            }
+        }
+
+        // 获取最优目标
+        Address bestAddress = m_scheduler->ScheduleNextTask(nowSeconds);
+
+        // 如果最优目标不是当前目标，进行成本比较
+        if (bestAddress != m_peerAddress)
+        {
+            // 获取当前消费者信息
+            InetSocketAddress currentAddr = InetSocketAddress::ConvertFrom(m_peerAddress);
+            uint32_t currentNodeId = 0;
+            CostMetrics currentCostDetailed = {0};
+
+            // 计算切换目标的成本
+            CostMetrics switchCost = {0};
+            uint32_t switchNodeId = 0;
+            InetSocketAddress switchAddr = InetSocketAddress::ConvertFrom(bestAddress);
+
+            for (const auto& consumer : consumers)
+            {
+                if (consumer.sinkAddress == m_peerAddress)
+                {
+                    currentNodeId = consumer.nodeId;
+                    currentCostDetailed = m_scheduler->CalculateCost(consumer, nowSeconds);
+                }
+                if (consumer.sinkAddress == bestAddress)
+                {
+                    switchNodeId = consumer.nodeId;
+                    switchCost = m_scheduler->CalculateCost(consumer, nowSeconds);
+                }
+            }
+
+            // 决策阈值：20%
+            double switchThreshold = 0.2;
+            double thresholdValue = currentCost.totalCost * (1.0 - switchThreshold);
+
+            // 详细切换日志
+            uint32_t producerNodeId = GetNode()->GetId();
+            NS_LOG_INFO("========== Connection Switch Decision (Producer Node " << producerNodeId << ") ==========");
+            NS_LOG_INFO("Current Target: Node " << currentNodeId
+                       << " (" << currentAddr.GetIpv4() << ":8080)");
+            NS_LOG_INFO("  Cost_Stay: " << std::fixed << std::setprecision(4) << currentCost.totalCost
+                       << " | Processing: " << currentCostDetailed.processingCost
+                       << " | QueuePenalty: " << currentCostDetailed.queuePenalty
+                       << " | WaitTime: " << std::setprecision(3) << currentCostDetailed.waitingTime << "s");
+            NS_LOG_INFO("");
+            NS_LOG_INFO("Switch Target: Node " << switchNodeId
+                       << " (" << switchAddr.GetIpv4() << ":8080)");
+            NS_LOG_INFO("  Cost_Switch: " << switchCost.totalCost
+                       << " | Processing: " << switchCost.processingCost
+                       << " | QueuePenalty: " << switchCost.queuePenalty
+                       << " | WaitTime: " << switchCost.waitingTime << "s");
+            NS_LOG_INFO("");
+            NS_LOG_INFO("Threshold (20% lower): " << thresholdValue);
+            NS_LOG_INFO("Decision: " << (switchCost.totalCost < thresholdValue ? "SWITCH" : "STAY"));
+
+            // 如果切换成本显著更低，则切换
+            if (switchCost.totalCost < thresholdValue)
+            {
+                double costReduction = currentCost.totalCost - switchCost.totalCost;
+                double reductionPercent = (costReduction / currentCost.totalCost) * 100.0;
+
+                NS_LOG_INFO("========== EXECUTING SWITCH ==========");
+                NS_LOG_INFO("Cost reduced from " << currentCost.totalCost
+                           << " to " << switchCost.totalCost
+                           << " (saving " << std::setprecision(2) << reductionPercent << "%)");
+                NS_LOG_INFO("Closing connection to Node " << currentNodeId
+                           << ", connecting to Node " << switchNodeId);
+
+                // 记录调度事件到XML
+                if (m_scheduler)
+                {
+                    m_scheduler->LogSchedulingEvent(producerNodeId,
+                                                   nowSeconds,
+                                                   m_peerAddress,
+                                                   bestAddress,
+                                                   currentCostDetailed,
+                                                   switchCost,
+                                                   thresholdValue,
+                                                   "SWITCH");
+                }
+
+                m_peerAddress = bestAddress;
+                if (m_socket)
+                {
+                    m_socket->Close();
+                    m_socket = nullptr;
+                    m_connected = false;
+                }
+
+                // 重新连接
+                TypeId tid = TypeId::LookupByName("ns3::TcpSocketFactory");
+                m_socket = Socket::CreateSocket(GetNode(), tid);
+
+                m_socket->SetConnectCallback(MakeCallback(&MyProducer::ConnectionSucceeded, this),
+                                             MakeCallback(&MyProducer::ConnectionFailed, this));
+                m_socket->SetSendCallback(MakeCallback(&MyProducer::HandleSend, this));
+                m_socket->SetCloseCallbacks(MakeCallback(&MyProducer::NormalClose, this),
+                                            MakeCallback(&MyProducer::ErrorClose, this));
+
+                m_socket->Connect(m_peerAddress);
+                return; // 等待连接
+            }
+            else
+            {
+                double costIncrease = switchCost.totalCost - currentCost.totalCost;
+                double increasePercent = (costIncrease / currentCost.totalCost) * 100.0;
+
+                NS_LOG_INFO("========== STAYING ON CURRENT ==========");
+                NS_LOG_INFO("Switch would increase cost from " << currentCost.totalCost
+                           << " to " << switchCost.totalCost
+                           << " (increase " << std::setprecision(2) << increasePercent << "%)");
+                NS_LOG_INFO("Maintaining connection to Node " << currentNodeId);
+
+                // 记录调度事件到XML
+                if (m_scheduler)
+                {
+                    m_scheduler->LogSchedulingEvent(producerNodeId,
+                                                   nowSeconds,
+                                                   m_peerAddress,
+                                                   bestAddress,
+                                                   currentCostDetailed,
+                                                   switchCost,
+                                                   thresholdValue,
+                                                   "STAY");
+                }
+            }
+        }
+    }
+
+    // 如果已连接，开始发送任务
     m_isSending = true;
     m_taskQueue.pop();
     m_totalTasksSent++;
@@ -825,6 +1105,9 @@ MyProducer::SendNextTask()
     m_currentSendingProducerId = GetNode()->GetId();
     m_currentSendingTaskId = m_totalTasksSent;
     m_totalBytesSentForCurrentTask = 0; // 重置字节计数器
+
+    // 记录任务开始时间（用于TTTT测量）
+    m_taskStartTime = Simulator::Now();
 
     NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 开始发送任务 "
                   << m_currentSendingProducerId << "-" << m_currentSendingTaskId
@@ -876,15 +1159,22 @@ MyProducer::SendPacket()
 
     // 任务完成
     //NS_LOG_INFO("Node " << GetNode()->GetId() << " finished sending task " << m_currentSendingProducerId << "-" << m_currentSendingTaskId);
+
+    // 计算TTTT（总任务传输时间）并报告给调度器
+    Time tttt = Simulator::Now() - m_taskStartTime;
+    NS_LOG_INFO("TTTT measured: " << tttt.GetSeconds() << "s for task "
+                << m_currentSendingProducerId << "-" << m_currentSendingTaskId);
+    ReportTTTT(m_peerAddress, tttt);
+
     m_isSending = false;
-    
+
     // 检查是否已请求停止 (m_running == false)
     if (!m_running)
     {
         // 软停止：任务已发送完毕，并且 StopApplication 已被调用。
         // 现在可以安全关闭套接字。
         /*
-                NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 " 
+                NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 "
                       << m_currentSendingProducerId << "-" << m_currentSendingTaskId
                       << "，现在关闭套接字。");
         */
@@ -900,6 +1190,128 @@ MyProducer::SendPacket()
     {
         // 正常操作：尝试发送队列中的下一个任务
         Simulator::ScheduleNow(&MyProducer::SendNextTask, this);
+    }
+}
+
+void
+MyProducer::ReportTTTT(Address consumerAddress, Time tttt)
+{
+    if (m_scheduler)
+    {
+        m_scheduler->ReportTTTTMeasured(consumerAddress, tttt);
+    }
+}
+
+void
+MyProducer::SendRTTProbe()
+{
+    if (!m_running || !m_udpSocket || m_consumerAddresses.empty())
+    {
+        return;
+    }
+
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: Sending RTT probe to "
+                << m_consumerAddresses.size() << " consumers");
+
+    // 向所有已知消费者发送探测包
+    for (const Address& consumerAddr : m_consumerAddresses)
+    {
+        // 创建1024字节的探测包
+        uint32_t probeSize = 1024;
+        uint32_t headerSize = ProbeHeader().GetSerializedSize();
+
+        // 8字节时间戳 + 1016字节填充
+        ProbeHeader header;
+        header.SetTimestamp(Simulator::Now());
+
+        Ptr<Packet> packet = Create<Packet>(probeSize - headerSize);
+        packet->AddHeader(header);
+
+        InetSocketAddress dstAddr = InetSocketAddress::ConvertFrom(consumerAddr);
+        InetSocketAddress probeAddr(dstAddr.GetIpv4(), 8081); // 使用8081端口
+
+        int bytesSent = m_udpSocket->SendTo(packet, 0, probeAddr);
+
+        if (bytesSent < 0)
+        {
+            NS_LOG_WARN("Failed to send RTT probe to " << dstAddr.GetIpv4());
+        }
+    }
+
+    // 调度下一次探测
+    Simulator::Schedule(Seconds(10.0), &MyProducer::SendRTTProbe, this);
+}
+
+void
+MyProducer::HandleRTTProbeReceive(Ptr<Socket> socket)
+{
+    Address from;
+    Ptr<Packet> packet = socket->RecvFrom(from);
+
+    // 期待接收8字节回复包
+    if (packet->GetSize() < 8)
+    {
+        return;
+    }
+
+    ProbeHeader header;
+    packet->RemoveHeader(header);
+
+    Time sendTime = header.GetTimestamp();
+    Time rtt = Simulator::Now() - sendTime;
+
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: RTT measured: " << rtt.GetSeconds() << "s");
+
+    // 报告RTT测量结果
+    if (m_scheduler)
+    {
+        InetSocketAddress inetFrom = InetSocketAddress::ConvertFrom(from);
+        // 构造TCP端口地址（从UDP地址转换）
+        Address consumerAddr = InetSocketAddress(inetFrom.GetIpv4(), 8080);
+        m_scheduler->ReportRTTMeasured(consumerAddr, rtt);
+    }
+}
+
+void
+MySink::HandleProbeReceive(Ptr<Socket> socket)
+{
+    Address from;
+    Ptr<Packet> packet = socket->RecvFrom(from);
+
+    // 期待接收1024字节探测包
+    if (packet->GetSize() < 1024)
+    {
+        NS_LOG_WARN("Received incomplete probe packet, size: " << packet->GetSize());
+        return;
+    }
+
+    // 提取前8字节时间戳
+    ProbeHeader header;
+    packet->RemoveHeader(header);
+    Time timestamp = header.GetTimestamp();
+
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: MySink (Node " << m_nodeId
+                << ") received probe from " << InetSocketAddress::ConvertFrom(from).GetIpv4()
+                << ", timestamp: " << timestamp.GetSeconds() << "s");
+
+    // 创建8字节回复包（只包含时间戳）
+    ProbeHeader replyHeader;
+    replyHeader.SetTimestamp(timestamp);
+
+    Ptr<Packet> replyPacket = Create<Packet>(0); // 0字节 payload
+    replyPacket->AddHeader(replyHeader);
+
+    // 发送回复
+    int bytesSent = socket->SendTo(replyPacket, 0, from);
+
+    if (bytesSent < 0)
+    {
+        NS_LOG_WARN("Failed to send probe reply to " << InetSocketAddress::ConvertFrom(from).GetIpv4());
+    }
+    else
+    {
+        NS_LOG_INFO("Probe reply sent to " << InetSocketAddress::ConvertFrom(from).GetIpv4()
+                    << " (" << bytesSent << " bytes)");
     }
 }
 
