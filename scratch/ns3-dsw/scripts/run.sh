@@ -30,7 +30,6 @@ CMD="topo_figure_flowmon_cfg_integrated \
 --simDuration=24 \
 --pcap=0 \
 --anim=1 \
---log=info \
 --flowXml=scratch/ns3-dsw/out/flowmon.xml \
 --statsCsv=scratch/ns3-dsw/out/flowstats.csv \
 --animXml=scratch/ns3-dsw/out/topo_figure.xml \
@@ -49,10 +48,13 @@ CMD="topo_figure_flowmon_cfg_integrated \
 --priceCsv=scratch/ns3-dsw/data/daily_price.csv \
 --powerCostXmlBase=scratch/ns3-dsw/out/power_cost \
 --enablePriceAwareScheduling=$ENABLE_PRICE_SCHEDULING \
---queuePenaltyFactor=$QUEUE_PENALTY_FACTOR"
+--queuePenaltyFactor=$QUEUE_PENALTY_FACTOR \
+--log=off"
 
 echo "Running simulation with Price-Aware Scheduling: $ENABLE_PRICE_SCHEDULING"
 echo "Queue Penalty Factor: $QUEUE_PENALTY_FACTOR"
+echo "Log output disabled for better performance"
 echo ""
 
-./ns3 run "$CMD"
+# 完全禁用所有日志输出以提高速度
+NS_LOG_DISABLE=all ./ns3 run "$CMD" > /dev/null 2>&1

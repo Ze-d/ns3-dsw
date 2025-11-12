@@ -44,6 +44,13 @@ NS_LOG_COMPONENT_DEFINE("TopoFigureFlowmonCfg");
 static std::ofstream g_xmlFile;
 static std::ofstream g_utilXmlFile;
 
+// 全局生产者映射，用于获取统计信息
+static std::map<uint32_t, Ptr<MyProducer>> g_producers;
+
+// 前向声明
+void OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target,
+                        uint32_t pendingTasks, uint32_t totalTasksSent, uint32_t totalTasksGenerated);
+
 // 注释：数据结构定义已移到 dsw-structures.h
 
 static std::vector<double>
@@ -129,13 +136,40 @@ OnSinkTaskCompleted(uint32_t nodeId, uint32_t producerId, uint32_t taskId, uint3
 }
 
 /**
+ * @brief 包装回调：从 Producer 获取统计信息并调用 OnProducerTaskSent
+ */
+void
+OnProducerTaskSentWrapper(uint32_t nodeId, uint32_t taskId, Address target)
+{
+    // 获取对应的 MyProducer 实例
+    auto it = g_producers.find(nodeId);
+    if (it != g_producers.end())
+    {
+        Ptr<MyProducer> producer = it->second;
+        uint32_t pendingTasks = producer->GetPendingTasks();
+        uint32_t totalTasksSent = producer->GetTotalTasksSent();
+        uint32_t totalTasksGenerated = producer->GetTotalTasksGenerated();
+        OnProducerTaskSent(nodeId, taskId, target, pendingTasks, totalTasksSent, totalTasksGenerated);
+    }
+    else
+    {
+        // 如果找不到producer，仍然调用但统计为0
+        OnProducerTaskSent(nodeId, taskId, target, 0, 0, 0);
+    }
+}
+
+/**
  * @brief 当 Producer 发送一个新任务时（Trace 回调）
  * @param nodeId 生产者的节点 ID (用于 "Edge-Id")
  * @param taskId 任务的 ID (在该生产者上是唯一的, 用于 "Task-Id")
  * @param target 任务发送的目标地址 (用于 "TargetIp")
+ * @param pendingTasks 当前pending的任务数
+ * @param totalTasksSent 已发送的任务总数
+ * @param totalTasksGenerated 已生成的任务总数
  */
 void
-OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
+OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target,
+                    uint32_t pendingTasks, uint32_t totalTasksSent, uint32_t totalTasksGenerated)
 {
     if (g_xmlFile.is_open())
     {
@@ -143,7 +177,10 @@ OnProducerTaskSent(uint32_t nodeId, uint32_t taskId, Address target)
                   << " Time=\"" << Simulator::Now().GetSeconds() << "\""
                   << " Edge-Id=\"Edge-" << nodeId << "\""
                   << " Task-Id=\"" << nodeId << "-" << taskId << "\""
-                  << " TargetIp=\"" << InetSocketAddress::ConvertFrom(target).GetIpv4() << "\"/>"
+                  << " TargetIp=\"" << InetSocketAddress::ConvertFrom(target).GetIpv4() << "\""
+                  << " PendingTasks=\"" << pendingTasks << "\""
+                  << " TotalSent=\"" << totalTasksSent << "\""
+                  << " TotalGenerated=\"" << totalTasksGenerated << "\"/>"
                   << std::endl;
     }
 }
@@ -555,7 +592,10 @@ main(int argc, char* argv[])
     }
     for (auto& producer : producers)
     {
-        producer->TraceConnectWithoutContext("TaskSent", MakeCallback(&OnProducerTaskSent));
+        // 将producer添加到全局映射中，以便在trace回调中获取统计信息
+        g_producers[producer->GetNode()->GetId()] = producer;
+
+        producer->TraceConnectWithoutContext("TaskSent", MakeCallback(&OnProducerTaskSentWrapper));
 
         // 配置价格感知调度
         if (scheduler)

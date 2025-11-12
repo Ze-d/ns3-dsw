@@ -167,6 +167,21 @@ public:
      */
     void SetScheduler(Ptr<PriceAwareScheduler> scheduler);
 
+    /**
+     * @brief 获取待发送队列中的任务数（pending）
+     */
+    uint32_t GetPendingTasks() const;
+
+    /**
+     * @brief 获取已发送的任务总数
+     */
+    uint32_t GetTotalTasksSent() const;
+
+    /**
+     * @brief 获取已生成的任务总数
+     */
+    uint32_t GetTotalTasksGenerated() const;
+
     TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
 
 private:
@@ -192,6 +207,7 @@ private:
     uint32_t    m_packetSize;
     uint64_t    m_totalBytesSentForCurrentTask; // 使用字节数跟踪 TCP 流
     uint32_t    m_totalTasksSent;
+    uint32_t    m_totalTasksGenerated;  // 跟踪生成的总任务数
     bool        m_isSending;
 
     uint32_t    m_currentSendingProducerId;

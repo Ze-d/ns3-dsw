@@ -607,6 +607,7 @@ MyProducer::MyProducer()
       m_packetSize(1024),
       m_totalBytesSentForCurrentTask(0),
       m_totalTasksSent(0),
+      m_totalTasksGenerated(0),
       m_isSending(false),
       m_currentSendingProducerId(0),
       m_currentSendingTaskId(0),
@@ -652,6 +653,24 @@ MyProducer::SetScheduler(Ptr<PriceAwareScheduler> scheduler)
     NS_LOG_FUNCTION(this << scheduler);
     m_scheduler = scheduler;
     NS_LOG_INFO("Scheduler set for producer on node " << GetNode()->GetId());
+}
+
+uint32_t
+MyProducer::GetPendingTasks() const
+{
+    return m_taskQueue.size();
+}
+
+uint32_t
+MyProducer::GetTotalTasksSent() const
+{
+    return m_totalTasksSent;
+}
+
+uint32_t
+MyProducer::GetTotalTasksGenerated() const
+{
+    return m_totalTasksGenerated;
 }
 
 void
@@ -765,6 +784,7 @@ MyProducer::GenerateTasks()
         {
             m_taskQueue.push(true);
         }
+        m_totalTasksGenerated += numTasksToGenerate;  // 累计生成任务数
         if (!m_isSending)
         {
             SendNextTask(); // 尝试启动发送
