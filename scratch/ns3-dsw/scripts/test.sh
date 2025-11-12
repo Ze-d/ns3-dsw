@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 这是一个占位符测试脚本
+# 这是一个git钩子脚本
 echo "Running tests... (Placeholder - Success)"
 
 # --- 1. 定义并创建专门的测试输出目录 ---
