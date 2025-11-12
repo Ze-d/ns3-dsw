@@ -52,13 +52,13 @@ void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers
     m_initialized = true;
 
     // 打开XML日志文件
-    m_xmlLogFile.open("/home/hurun/project/ns3-dsw/scratch/ns3-dsw/out/scheduler_events.xml", std::ios::out | std::ios::trunc);
+    m_xmlLogFile.open("scratch/ns3-dsw/out/scheduler_events.xml", std::ios::out | std::ios::trunc);
     if (m_xmlLogFile.is_open())
     {
         m_xmlLogFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
         m_xmlLogFile << "<SchedulerEvents>" << std::endl;
         m_xmlLogFile << std::fixed << std::setprecision(6);
-        NS_LOG_INFO("Scheduler XML log opened: /home/hurun/project/ns3-dsw/scratch/ns3-dsw/out/scheduler_events.xml");
+        NS_LOG_INFO("Scheduler XML log opened: scratch/ns3-dsw/out/scheduler_events.xml");
     }
     else
     {
