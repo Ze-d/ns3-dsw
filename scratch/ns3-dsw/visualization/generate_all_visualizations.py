@@ -57,14 +57,15 @@ def main():
         'core_utilization_line_chart.py',
         'power_cost_line_chart.py',
         'link_utilization_heatmap.py',
-        'consumer_task_stacked_area.py'
+        'consumer_task_stacked_area.py',
+        'scheduler_events.py'
     ]
 
     print("\n" + "="*60)
     print(" ns3-dsw 仿真结果可视化生成器")
     print("="*60)
     print(f"\n输出目录: {output_dir}")
-    print(f"将要生成 4 种可视化图表:")
+    print(f"将要生成 {len(scripts)} 种可视化图表:")
     for i, script in enumerate(scripts, 1):
         print(f"  {i}. {script.replace('_', ' ').replace('.py', '').title()}")
 
@@ -76,7 +77,8 @@ def main():
         script_dir / '../out/power_cost_node6.xml',
         script_dir / '../out/power_cost_node9.xml',
         script_dir / '../out/link_util.xml',
-        script_dir / '../out/pro_sink_stats.xml'
+        script_dir / '../out/pro_sink_stats.xml',
+        script_dir / '../out/scheduler_events.xml'
     ]
 
     missing_files = [f for f in required_files if not Path(f).exists()]

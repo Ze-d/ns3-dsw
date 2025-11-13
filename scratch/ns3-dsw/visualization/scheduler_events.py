@@ -53,9 +53,9 @@ def parse_scheduler_events(file_path):
             
         data.append({
             'Time': time,
-            'Producer': f"Producer {producer}", # 格式化为字符串,以便 Y 轴排序
+            'Producer': f"Edge-{producer}", # 格式化为字符串,以便 Y 轴排序
             'Decision': decision,
-            'FinalTargetNode': f"Node {final_target_node}" # 格式化以便图例显示
+            'FinalTargetNode': f"Core-{final_target_node}" # 格式化以便图例显示
         })
     
     print(f"解析完成, 共 {len(data)} 条调度事件。")
@@ -68,17 +68,20 @@ def create_scheduler_plot(df):
     print("正在生成调度决策散点图...")
 
     # 筛选出我们关心的三个消费者节点
-    consumers_to_plot = ['Node 2', 'Node 6', 'Node 9']
+    consumers_to_plot = ['Core-2', 'Core-6', 'Core-9']
     df_filtered = df[df['FinalTargetNode'].isin(consumers_to_plot)]
 
     # 创建图形
     plt.figure(figsize=(12, 8))
 
-    # 为每个消费者节点定义颜色
-    colors = {'Node 2': 'red', 'Node 6': 'blue', 'Node 9': 'green'}
+    # 添加虚线网格，alpha=0.6
+    plt.grid(True, linestyle='--', alpha=0.6)
 
-    # 获取唯一的生产者节点
-    producers = sorted(df_filtered['Producer'].unique())
+    # 为每个消费者节点定义颜色
+    colors = {'Core-2': 'red', 'Core-6': 'blue', 'Core-9': 'green'}
+
+    # 获取唯一的生产者节点并按节点编号排序
+    producers = sorted(df_filtered['Producer'].unique(), key=lambda x: int(x.split('-')[1]))
 
     # 为每个生产者创建 y 轴位置
     y_positions = {producer: i for i, producer in enumerate(producers)}
@@ -101,7 +104,7 @@ def create_scheduler_plot(df):
     plt.ylabel('Producer Nodes', fontsize=12)
 
     # 添加图例
-    plt.legend(title='Target Consumer Node', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(title='Target Core Node', bbox_to_anchor=(1.05, 1), loc='upper left')
 
     # 调整布局
     plt.tight_layout()

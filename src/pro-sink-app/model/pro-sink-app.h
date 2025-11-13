@@ -15,6 +15,7 @@
 #include <map>     // 包含 map
 #include <list>    // 包含 list
 #include <utility> // 包含 pair
+#include <cmath>   // 包含数学函数
 
 #include <fstream>
 #include <string>
@@ -272,6 +273,9 @@ private:
     // --- 价格感知调度 ---
     bool m_enablePriceAwareScheduling;  // 是否启用价格感知调度
     Ptr<PriceAwareScheduler> m_scheduler;  // 调度器实例
+    double m_switchThreshold;  // 切换阈值（带随机扰动，避免从众切换）
+    uint32_t m_taskCounter;  // 任务计数器，用于降低决策频率（每5个任务检查一次）
+    uint32_t m_decisionInterval;  // 决策间隔（每5个任务）
 
 };
 
