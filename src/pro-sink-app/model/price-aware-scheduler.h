@@ -61,10 +61,12 @@ public:
     /**
      * @brief 更新消费者状态
      * @param nodeId 节点ID
-     * @param utilization 当前利用率
-     * @param queueLength 当前队列长度
+     * @param utilization 当前利用率（指针，nullptr表示不更新）
+     * @param queueLength 当前队列长度（指针，nullptr表示不更新）
+     *
+     * @details 使用指针参数可以精确控制需要更新的字段，避免覆盖
      */
-    void UpdateConsumerState(uint32_t nodeId, double utilization, uint32_t queueLength);
+    void UpdateConsumerState(uint32_t nodeId, const double* utilization, const uint32_t* queueLength);
 
     /**
      * @brief 计算指定消费者的调度成本
@@ -73,6 +75,15 @@ public:
      * @return 成本指标
      */
     CostMetrics CalculateCost(const ConsumerState& consumer, double taskArrivalTime);
+
+    /**
+     * @brief 计算指定消费者的调度成本（使用EWMA平滑队列长度）
+     * @param consumer 消费者状态
+     * @param taskArrivalTime 任务到达时间
+     * @param smoothedQueueLength 平滑后的队列长度
+     * @return 成本指标
+     */
+    CostMetrics CalculateCost(const ConsumerState& consumer, double taskArrivalTime, double smoothedQueueLength);
 
     /**
      * @brief 获取价格预测
@@ -137,6 +148,30 @@ public:
                             CostMetrics switchCost,
                             double threshold,
                             const std::string& decision);
+
+private:
+    /**
+     * @brief 更新EWMA队列长度
+     * @param consumer 消费者状态引用
+     * @param queueLength 新的队列长度
+     *
+     * @details
+     * 使用指数加权移动平均算法更新队列长度的平滑值
+     * formula: alpha = 1.0 - exp(-dt / EWMA_SPAN_SECONDS)
+     * new_avg = alpha * new_value + (1 - alpha) * old_avg
+     */
+    void UpdateEwmaQueueLength(ConsumerState& consumer, uint32_t queueLength);
+
+    /**
+     * @brief 获取平滑后的队列长度
+     * @param consumer 消费者状态引用
+     * @return 平滑后的队列长度
+     *
+     * @details
+     * 在查询前先进行"衰减"计算，确保长时间空闲后返回正确的值
+     * 如果距离上次更新有很长时间，会向当前瞬时队列长度衰减
+     */
+    double GetSmoothedQueueLength(ConsumerState& consumer);
 
 private:
     /**

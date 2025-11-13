@@ -231,7 +231,7 @@ OnSinkUtilizationForScheduler(uint32_t nodeId, double utilization)
 {
     if (g_scheduler)
     {
-        g_scheduler->UpdateConsumerState(nodeId, utilization, 0);
+        g_scheduler->UpdateConsumerState(nodeId, &utilization, nullptr);
     }
 }
 
@@ -243,7 +243,7 @@ OnSinkQueueLengthForScheduler(uint32_t nodeId, uint32_t queueLength)
 {
     if (g_scheduler)
     {
-        g_scheduler->UpdateConsumerState(nodeId, 0.0, queueLength);
+        g_scheduler->UpdateConsumerState(nodeId, nullptr, &queueLength);
     }
 }
 
