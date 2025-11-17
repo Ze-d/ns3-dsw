@@ -1,6 +1,6 @@
-# ns3-dsw 仿真结果可视化工具
+# ns3-dsw 仿真结果分析与可视化工具
 
-本工具包提供了基于 ns3-dsw 仿真数据的4种可视化图表生成脚本，用于分析网络仿真结果。
+本工具包提供了基于 ns3-dsw 仿真数据的可视化图表生成和KPI计算脚本，用于分析网络仿真结果。
 
 ## 📊 生成的图表类型
 
@@ -28,18 +28,47 @@
 - **时间窗口**: 0.5秒
 - **用途**: 分析调度器在不同时间段的分配策略变化
 
+### 5. 调度器决策散点图 (scheduler_decision_plot.png)
+- **数据源**: `out/scheduler_events.xml`
+- **展示内容**: 生产者节点的调度决策分布
+- **用途**: 分析调度器抖动(Thrashing)现象，监控连接切换模式
+
+## 📊 KPI 计算
+
+本工具还提供七个关键性能指标的计算：
+
+1. **总电价** - 统计所有节点的累计电费
+2. **整体平均算力利用率** - 消费者核心的平均利用率
+3. **整体平均延迟** - 网络流的平均延迟
+4. **整体链路平均带宽** - 所有链路的平均带宽
+5. **整体链路平均利用率** - 所有链路的平均利用率
+6. **完成总任务数** - 所有计算核心完成的任务总和
+7. **平均每任务电价** - 总电价除以完成任务数
+
+使用方法：
+```bash
+python3 calculate_kpi.py
+```
+
 ## 🚀 快速开始
 
 ### 方法一：一键生成所有图表（推荐）
 
 ```bash
-cd /home/hurun/project/ns3-dsw/scratch/ns3-dsw/visualization
+cd scratch/ns3-dsw/analization
 python3 generate_all_visualizations.py
 ```
 
-此命令将自动运行所有4个脚本，生成完整的图表集合。
+此命令将自动运行所有5个可视化脚本，生成完整的图表集合。
 
-### 方法二：单独运行某个脚本
+### 方法二：计算KPI统计量
+
+```bash
+# 计算七个关键性能指标
+python3 calculate_kpi.py
+```
+
+### 方法三：单独运行某个脚本
 
 ```bash
 # 生成核心利用率折线图
@@ -53,26 +82,32 @@ python3 link_utilization_heatmap.py
 
 # 生成消费者任务堆积面积图
 python3 consumer_task_stacked_area.py
+
+# 生成调度器事件散点图
+python3 scheduler_events.py
 ```
 
 ## 📂 文件结构
 
 ```
-visualization/
-├── README.md                              # 本文档
-├── config.py                              # 公共配置（字体、样式等）
-├── generate_all_visualizations.py         # 一键生成脚本
-├── core_utilization_line_chart.py         # 核心利用率折线图
-├── power_cost_line_chart.py               # 节点电费折线图
-├── link_utilization_heatmap.py            # 链路利用率热力图
-└── consumer_task_stacked_area.py          # 消费者任务堆积面积图
-
-out/
-└── visualization/                         # 图表输出目录
-    ├── core_utilization.png/.svg          # 核心利用率图表
-    ├── power_cost.png/.svg                # 节点电费图表
-    ├── link_utilization_heatmap.png/.svg  # 链路利用率热力图
-    └── consumer_task_stacked_area.png/.svg # 消费者任务图表
+scratch/ns3-dsw/
+├── analization/                           # 可视化分析脚本目录
+│   ├── README.md                          # 本文档
+│   ├── config.py                          # 公共配置（字体、样式等）
+│   ├── generate_all_visualizations.py     # 一键生成脚本
+│   ├── calculate_kpi.py                   # KPI计算脚本
+│   ├── core_utilization_line_chart.py     # 核心利用率折线图
+│   ├── power_cost_line_chart.py           # 节点电费折线图
+│   ├── link_utilization_heatmap.py        # 链路利用率热力图
+│   ├── consumer_task_stacked_area.py      # 消费者任务堆积面积图
+│   └── scheduler_events.py                # 调度事件可视化脚本
+└── out/
+    └── visualization/                     # 图表输出目录
+        ├── core_utilization.png/.svg      # 核心利用率图表
+        ├── power_cost.png/.svg            # 节点电费图表
+        ├── link_utilization_heatmap.png/.svg # 链路利用率热力图
+        ├── consumer_task_stacked_area.png/.svg # 消费者任务图表
+        └── scheduler_decision_plot.png/.svg # 调度决策图表
 ```
 
 ## 🔧 依赖环境
@@ -89,7 +124,7 @@ out/
 - **PNG格式**: 适合嵌入文档、演示文稿
 - **SVG格式**: 矢量图，无损缩放，适合学术论文
 
-所有文件保存在 `/home/hurun/project/ns3-dsw/scratch/ns3-dsw/out/visualization/` 目录下。
+所有文件保存在 `scratch/ns3-dsw/out/visualization/` 目录下。
 
 ## ⚠️ 注意事项
 
@@ -100,6 +135,8 @@ out/
    - power_cost_node9.xml
    - link_util.xml
    - pro_sink_stats.xml
+   - scheduler_events.xml
+   - flowstats.csv
 
 2. **字体警告**: 如果看到中文字体警告，不影响图表生成，仅可能影响中文标签显示
 

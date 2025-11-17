@@ -938,7 +938,7 @@ MyProducer::SendNextTask()
         if (m_enablePriceAwareScheduling && m_scheduler)
         {
             double nowSeconds = Simulator::Now().GetSeconds();
-            Address newAddress = m_scheduler->ScheduleNextTask(nowSeconds);
+            Address newAddress = m_scheduler->ScheduleNextTask(nowSeconds, GetPendingTasks());
 
             if (newAddress != m_peerAddress)
             {
@@ -998,18 +998,21 @@ MyProducer::SendNextTask()
             const std::vector<ConsumerState>& consumers = m_scheduler->GetConsumers();
 
             // 计算当前目标的成本
+            uint32_t pendingTasks = GetPendingTasks();
             CostMetrics currentCost = {0};
             for (const auto& consumer : consumers)
             {
                 if (consumer.sinkAddress == m_peerAddress)
                 {
-                    currentCost = m_scheduler->CalculateCost(consumer, nowSeconds);
+                    // 对于非EWMA版本的CalculateCost，我们需要传递平滑队列长度
+                    double smoothedQueueLength = consumer.m_ewmaQueueLength;
+                    currentCost = m_scheduler->CalculateCost(consumer, nowSeconds, smoothedQueueLength, pendingTasks);
                     break;
                 }
             }
 
             // 获取最优目标
-            Address bestAddress = m_scheduler->ScheduleNextTask(nowSeconds);
+            Address bestAddress = m_scheduler->ScheduleNextTask(nowSeconds, pendingTasks);
 
         // 如果最优目标不是当前目标，进行成本比较
         if (bestAddress != m_peerAddress)
@@ -1029,12 +1032,14 @@ MyProducer::SendNextTask()
                 if (consumer.sinkAddress == m_peerAddress)
                 {
                     currentNodeId = consumer.nodeId;
-                    currentCostDetailed = m_scheduler->CalculateCost(consumer, nowSeconds);
+                    double smoothedQueueLength = consumer.m_ewmaQueueLength;
+                    currentCostDetailed = m_scheduler->CalculateCost(consumer, nowSeconds, smoothedQueueLength, pendingTasks);
                 }
                 if (consumer.sinkAddress == bestAddress)
                 {
                     switchNodeId = consumer.nodeId;
-                    switchCost = m_scheduler->CalculateCost(consumer, nowSeconds);
+                    double smoothedQueueLength = consumer.m_ewmaQueueLength;
+                    switchCost = m_scheduler->CalculateCost(consumer, nowSeconds, smoothedQueueLength, pendingTasks);
                 }
             }
 
@@ -1044,18 +1049,21 @@ MyProducer::SendNextTask()
             // 详细切换日志
             uint32_t producerNodeId = GetNode()->GetId();
             NS_LOG_INFO("========== Connection Switch Decision (Producer Node " << producerNodeId << ") ==========");
+            NS_LOG_INFO("Pending Tasks: " << pendingTasks);
             NS_LOG_INFO("Current Target: Node " << currentNodeId
                        << " (" << currentAddr.GetIpv4() << ":8080)");
             NS_LOG_INFO("  Cost_Stay: " << std::fixed << std::setprecision(4) << currentCost.totalCost
                        << " | Processing: " << currentCostDetailed.processingCost
-                       << " | QueuePenalty: " << currentCostDetailed.queuePenalty
+                       << " | TimeCost: " << currentCostDetailed.timeCost
+                       << " | ProducerWeight: " << currentCostDetailed.producerWeight
                        << " | WaitTime: " << std::setprecision(3) << currentCostDetailed.waitingTime << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Switch Target: Node " << switchNodeId
                        << " (" << switchAddr.GetIpv4() << ":8080)");
             NS_LOG_INFO("  Cost_Switch: " << switchCost.totalCost
                        << " | Processing: " << switchCost.processingCost
-                       << " | QueuePenalty: " << switchCost.queuePenalty
+                       << " | TimeCost: " << switchCost.timeCost
+                       << " | ProducerWeight: " << switchCost.producerWeight
                        << " | WaitTime: " << switchCost.waitingTime << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Threshold (" << std::setprecision(1) << (m_switchThreshold * 100) << "% lower): " << thresholdValue);

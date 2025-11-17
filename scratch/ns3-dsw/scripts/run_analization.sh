@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
-# ns3-dsw 可视化生成脚本
-# 用于快速生成所有仿真结果图表
-# 使用方法: bash scripts/run_visualization.sh
+#!/bin/bash
+# ns3-dsw 仿真结果分析与可视化脚本
+# 先生成可视化图表，再计算和显示KPI统计量
+# 使用方法: bash scripts/run_analization.sh
 
 # 颜色定义
 RED='\033[0;31m'
@@ -12,12 +12,12 @@ NC='\033[0m' # No Color
 
 # 显示标题
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE} ns3-dsw 仿真结果可视化生成器${NC}"
+echo -e "${BLUE} ns3-dsw 仿真结果分析与可视化${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # 检查Python是否可用
-if ! command -v python3 &> /dev/null; then
+if ! command -v python3 &> /dev/null && [ ! -f /usr/bin/python3 ]; then
     echo -e "${RED}错误: 未找到 python3，请先安装 Python 3${NC}"
     exit 1
 fi
@@ -39,6 +39,7 @@ REQUIRED_FILES=(
     "$DATA_DIR/power_cost_node9.xml"
     "$DATA_DIR/link_util.xml"
     "$DATA_DIR/pro_sink_stats.xml"
+    "$DATA_DIR/flowstats.csv"
 )
 
 MISSING_FILES=0
@@ -60,17 +61,19 @@ fi
 echo -e "${GREEN}✅ 所有数据文件都存在${NC}"
 echo ""
 
-# 运行可视化脚本
-echo -e "${YELLOW}开始生成可视化图表...${NC}"
+# ========================================================================
+# 第一步：生成可视化图表
+# ========================================================================
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE} 第一步：生成可视化图表${NC}"
+echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # 切换到项目根目录，然后运行可视化脚本
 cd "$SCRIPT_DIR/.." || exit 1
 if python3 analization/generate_all_visualizations.py; then
     echo ""
-    echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}✅ 可视化生成完成！${NC}"
-    echo -e "${GREEN}========================================${NC}"
     echo ""
     echo -e "${BLUE}生成的图表:${NC}"
     ls -lh "$SCRIPT_DIR/../out/visualization/"*.png 2>/dev/null | awk '{print "  📊 " $9 " (" $5 ")"}'
@@ -84,3 +87,24 @@ else
     echo -e "${RED}========================================${NC}"
     exit 1
 fi
+
+# ========================================================================
+# 第二步：计算和显示KPI统计量
+# ========================================================================
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE} 第二步：计算KPI统计量${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+# 运行KPI计算脚本
+OUT_DIR="$DATA_DIR" python3 analization/calculate_kpi.py
+
+echo ""
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}✅ 分析完成！${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo ""
+echo -e "${BLUE}总结:${NC}"
+echo "  1. 可视化图表已生成到: $SCRIPT_DIR/../out/visualization/"
+echo "  2. KPI统计量已计算完成"
+echo ""

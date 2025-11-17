@@ -69,8 +69,10 @@ struct CostMetrics
 {
     double totalCost = 0.0;        // 总成本
     double processingCost = 0.0;   // 处理成本
-    double queuePenalty = 0.0;     // 队列积压惩罚
+    double timeCost = 0.0;         // 时间成本（TTTT + 队列等待时间）
+    double queuePenalty = 0.0;     // 队列积压惩罚（向后兼容）
     double waitingTime = 0.0;      // 预计等待时间 (秒)
+    double producerWeight = 1.0;   // 生产者压力权重
 };
 
 struct NodeSpec

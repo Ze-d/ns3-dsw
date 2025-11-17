@@ -20,6 +20,7 @@ TypeId PriceAwareScheduler::GetTypeId(void)
 PriceAwareScheduler::PriceAwareScheduler()
     : m_queuePenaltyFactor(0.1),
       m_loadDecayFactor(0.5),
+      m_producerWeightFactor(0.15),
       m_initialized(false),
       m_xmlLogFile()
 {
@@ -41,14 +42,16 @@ PriceAwareScheduler::~PriceAwareScheduler()
 void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers,
                                      const std::vector<double>& priceProfile,
                                      double queuePenaltyFactor,
-                                     double loadDecayFactor)
+                                     double loadDecayFactor,
+                                     double producerWeightFactor)
 {
-    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor);
+    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor << producerWeightFactor);
 
     m_consumers = consumers;
     m_priceProfile = priceProfile;
     m_queuePenaltyFactor = queuePenaltyFactor;
     m_loadDecayFactor = loadDecayFactor;
+    m_producerWeightFactor = producerWeightFactor;
     m_initialized = true;
 
     // 打开XML日志文件
@@ -70,9 +73,9 @@ void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers
               << "load decay factor " << loadDecayFactor << ".");
 }
 
-Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime)
+Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t producerPendingTasks)
 {
-    NS_LOG_FUNCTION(this << taskArrivalTime);
+    NS_LOG_FUNCTION(this << taskArrivalTime << producerPendingTasks);
 
     if (!m_initialized)
     {
@@ -91,6 +94,8 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime)
     const ConsumerState* bestConsumer = nullptr;
 
     NS_LOG_INFO("========== Scheduling Decision at T=" << taskArrivalTime << "s ==========");
+    NS_LOG_INFO("Producer Pending Tasks: " << producerPendingTasks);
+    NS_LOG_INFO("Producer Weight Factor: " << m_producerWeightFactor);
     NS_LOG_INFO("Evaluating " << m_consumers.size() << " consumers:");
 
     for (auto& consumer : m_consumers)
@@ -98,15 +103,16 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime)
         // 先更新并获取平滑队列长度（进行"衰减"）
         double smoothedQueueLength = GetSmoothedQueueLength(consumer);
 
-        // 使用EWMA平滑值计算成本
-        CostMetrics metrics = CalculateCost(consumer, taskArrivalTime, smoothedQueueLength);
+        // 使用EWMA平滑值计算成本，传递生产者待处理任务数
+        CostMetrics metrics = CalculateCost(consumer, taskArrivalTime, smoothedQueueLength, producerPendingTasks);
 
         InetSocketAddress consumerAddr = InetSocketAddress::ConvertFrom(consumer.sinkAddress);
         NS_LOG_INFO("  Consumer " << consumer.nodeId
                     << " (" << consumerAddr.GetIpv4() << ":8080)"
                     << " - TotalCost: " << std::fixed << std::setprecision(4) << metrics.totalCost
                     << " | ProcessingCost: " << metrics.processingCost
-                    << " | QueuePenalty: " << metrics.queuePenalty
+                    << " | TimeCost: " << metrics.timeCost
+                    << " | ProducerWeight: " << metrics.producerWeight
                     << " | WaitTime: " << std::setprecision(3) << metrics.waitingTime << "s"
                     << " | TTTT: " << PredictTTTT(consumer).GetSeconds() << "s"
                     << " | SmoothedQueue: " << smoothedQueueLength);
@@ -157,9 +163,10 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
 
 CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
                                                double taskArrivalTime,
-                                               double smoothedQueueLength)
+                                               double smoothedQueueLength,
+                                               uint32_t producerPendingTasks)
 {
-    NS_LOG_FUNCTION(this << consumer.nodeId << taskArrivalTime << smoothedQueueLength);
+    NS_LOG_FUNCTION(this << consumer.nodeId << taskArrivalTime << smoothedQueueLength << producerPendingTasks);
 
     CostMetrics metrics;
 
@@ -170,7 +177,7 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 2. 计算处理时间
     double processingTime = CalculateProcessingTime(consumer);
 
-    // 3. 计算等待时间 - 使用平滑队列长度
+    // 3. 计算队列等待时间 - 使用平滑队列长度
     double queueWaitTime = smoothedQueueLength * processingTime;
     metrics.waitingTime = queueWaitTime;
 
@@ -183,11 +190,18 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 6. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // 7. 计算队列积压惩罚 - 使用EWMA平滑值
-    metrics.queuePenalty = smoothedQueueLength * m_queuePenaltyFactor;
+    // 7. 计算时间成本 = (TTTT + 队列等待时间) * 惩罚系数
+    double totalWaitTime = predictedTTTT.GetSeconds() + queueWaitTime;
+    metrics.timeCost = totalWaitTime * m_queuePenaltyFactor;
 
-    // 8. 总成本
-    metrics.totalCost = metrics.processingCost + metrics.queuePenalty;
+    // 8. 计算生产者压力权重
+    metrics.producerWeight = 1.0 + (static_cast<double>(producerPendingTasks) * m_producerWeightFactor);
+
+    // 9. 总成本 = 处理成本 + (时间成本 * 生产者压力权重)
+    metrics.totalCost = metrics.processingCost + (metrics.timeCost * metrics.producerWeight);
+
+    // 10. 保留queuePenalty以向后兼容（实际上已整合到timeCost中）
+    metrics.queuePenalty = metrics.timeCost * metrics.producerWeight;
 
     return metrics;
 }
@@ -322,6 +336,13 @@ void PriceAwareScheduler::SetLoadDecayFactor(double factor)
     NS_LOG_FUNCTION(this << factor);
     m_loadDecayFactor = factor;
     NS_LOG_INFO("Load decay factor set to " << m_loadDecayFactor);
+}
+
+void PriceAwareScheduler::SetProducerWeightFactor(double factor)
+{
+    NS_LOG_FUNCTION(this << factor);
+    m_producerWeightFactor = factor;
+    NS_LOG_INFO("Producer weight factor set to " << m_producerWeightFactor);
 }
 
 const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const
