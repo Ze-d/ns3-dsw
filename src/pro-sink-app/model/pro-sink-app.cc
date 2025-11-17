@@ -697,7 +697,10 @@ MyProducer::MyProducer()
       m_running(false),
       m_connected(false),
       m_enablePriceAwareScheduling(false),
-      m_scheduler(nullptr)
+      m_scheduler(nullptr),
+      m_switchThreshold(0.25),  // 默认25%阈值
+      m_taskCounter(0),
+      m_decisionInterval(5)  // 每5个任务检查一次
 {
 }
 
@@ -762,6 +765,23 @@ MyProducer::SetConsumerAddresses(const std::vector<Address>& sinkAddresses)
 void
 MyProducer::StartApplication()
 {
+    // 初始化随机切换阈值（25% ± 5%，避免从众切换）
+    // 每个节点使用不同的随机阈值，范围：[0.20, 0.30]
+    double baseThreshold = 0.25;
+    double jitterRange = 0.05;  // ±5%
+    double nodeId = static_cast<double>(GetNode()->GetId());
+
+    // 基于节点ID生成确定性随机数，避免每次运行都不同
+    // 使用简单的伪随机算法：frac(sin(nodeId) * 10000)
+    double randomFactor = std::fabs(std::sin(nodeId * 12.9898) * 43758.5453);
+    double randomJitter = (randomFactor - std::floor(randomFactor)) * 2.0 - 1.0;  // [-1, 1]
+
+    m_switchThreshold = baseThreshold + randomJitter * jitterRange;
+    m_switchThreshold = std::max(0.20, std::min(0.30, m_switchThreshold));  // 限制在[0.20, 0.30]
+
+    NS_LOG_INFO("Producer Node " << GetNode()->GetId() << ": Switch threshold initialized to "
+               << std::fixed << std::setprecision(3) << (m_switchThreshold * 100) << "%");
+
     // 创建UDP套接字用于RTT探测
     if (!m_consumerAddresses.empty())
     {
@@ -918,7 +938,7 @@ MyProducer::SendNextTask()
         if (m_enablePriceAwareScheduling && m_scheduler)
         {
             double nowSeconds = Simulator::Now().GetSeconds();
-            Address newAddress = m_scheduler->ScheduleNextTask(nowSeconds);
+            Address newAddress = m_scheduler->ScheduleNextTask(nowSeconds, GetPendingTasks());
 
             if (newAddress != m_peerAddress)
             {
@@ -949,28 +969,50 @@ MyProducer::SendNextTask()
     // 已连接状态下的动态决策
     if (m_enablePriceAwareScheduling && m_scheduler)
     {
-        double nowSeconds = Simulator::Now().GetSeconds();
+        // 增加任务计数器
+        m_taskCounter++;
 
-        // 计算当前目标的成本（Cost_Stay）
-        // 注意：这里需要获取消费者列表来计算成本
-        // 简化实现：直接询问调度器最优目标，然后与当前目标比较
+        // 每隔 m_decisionInterval 个任务才进行一次决策检查，减少震荡
+        bool shouldMakeDecision = (m_taskCounter % m_decisionInterval == 0);
 
-        // 获取所有消费者列表
-        const std::vector<ConsumerState>& consumers = m_scheduler->GetConsumers();
-
-        // 计算当前目标的成本
-        CostMetrics currentCost = {0};
-        for (const auto& consumer : consumers)
+        if (!shouldMakeDecision)
         {
-            if (consumer.sinkAddress == m_peerAddress)
-            {
-                currentCost = m_scheduler->CalculateCost(consumer, nowSeconds);
-                break;
-            }
+            // 不是决策时刻，直接使用当前目标发送任务
+            NS_LOG_DEBUG("Skipping scheduling decision for task #" << m_taskCounter
+                        << " (decision interval: " << m_decisionInterval << ")");
+            // 不改变 m_peerAddress，直接发送
         }
+        else
+        {
+            // 进行决策检查
+            NS_LOG_INFO("Task #" << m_taskCounter << ": Performing scheduling decision (interval: "
+                       << m_decisionInterval << ")");
 
-        // 获取最优目标
-        Address bestAddress = m_scheduler->ScheduleNextTask(nowSeconds);
+            double nowSeconds = Simulator::Now().GetSeconds();
+
+            // 计算当前目标的成本（Cost_Stay）
+            // 注意：这里需要获取消费者列表来计算成本
+            // 简化实现：直接询问调度器最优目标，然后与当前目标比较
+
+            // 获取所有消费者列表
+            const std::vector<ConsumerState>& consumers = m_scheduler->GetConsumers();
+
+            // 计算当前目标的成本
+            uint32_t pendingTasks = GetPendingTasks();
+            CostMetrics currentCost = {0};
+            for (const auto& consumer : consumers)
+            {
+                if (consumer.sinkAddress == m_peerAddress)
+                {
+                    // 对于非EWMA版本的CalculateCost，我们需要传递平滑队列长度
+                    double smoothedQueueLength = consumer.m_ewmaQueueLength;
+                    currentCost = m_scheduler->CalculateCost(consumer, nowSeconds, smoothedQueueLength, pendingTasks);
+                    break;
+                }
+            }
+
+            // 获取最优目标
+            Address bestAddress = m_scheduler->ScheduleNextTask(nowSeconds, pendingTasks);
 
         // 如果最优目标不是当前目标，进行成本比较
         if (bestAddress != m_peerAddress)
@@ -990,37 +1032,41 @@ MyProducer::SendNextTask()
                 if (consumer.sinkAddress == m_peerAddress)
                 {
                     currentNodeId = consumer.nodeId;
-                    currentCostDetailed = m_scheduler->CalculateCost(consumer, nowSeconds);
+                    double smoothedQueueLength = consumer.m_ewmaQueueLength;
+                    currentCostDetailed = m_scheduler->CalculateCost(consumer, nowSeconds, smoothedQueueLength, pendingTasks);
                 }
                 if (consumer.sinkAddress == bestAddress)
                 {
                     switchNodeId = consumer.nodeId;
-                    switchCost = m_scheduler->CalculateCost(consumer, nowSeconds);
+                    double smoothedQueueLength = consumer.m_ewmaQueueLength;
+                    switchCost = m_scheduler->CalculateCost(consumer, nowSeconds, smoothedQueueLength, pendingTasks);
                 }
             }
 
-            // 决策阈值：20%
-            double switchThreshold = 0.2;
-            double thresholdValue = currentCost.totalCost * (1.0 - switchThreshold);
+            // 决策阈值：使用节点的随机阈值（25% ± 5%）
+            double thresholdValue = currentCost.totalCost * (1.0 - m_switchThreshold);
 
             // 详细切换日志
             uint32_t producerNodeId = GetNode()->GetId();
             NS_LOG_INFO("========== Connection Switch Decision (Producer Node " << producerNodeId << ") ==========");
+            NS_LOG_INFO("Pending Tasks: " << pendingTasks);
             NS_LOG_INFO("Current Target: Node " << currentNodeId
                        << " (" << currentAddr.GetIpv4() << ":8080)");
             NS_LOG_INFO("  Cost_Stay: " << std::fixed << std::setprecision(4) << currentCost.totalCost
                        << " | Processing: " << currentCostDetailed.processingCost
-                       << " | QueuePenalty: " << currentCostDetailed.queuePenalty
+                       << " | TimeCost: " << currentCostDetailed.timeCost
+                       << " | ProducerWeight: " << currentCostDetailed.producerWeight
                        << " | WaitTime: " << std::setprecision(3) << currentCostDetailed.waitingTime << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Switch Target: Node " << switchNodeId
                        << " (" << switchAddr.GetIpv4() << ":8080)");
             NS_LOG_INFO("  Cost_Switch: " << switchCost.totalCost
                        << " | Processing: " << switchCost.processingCost
-                       << " | QueuePenalty: " << switchCost.queuePenalty
+                       << " | TimeCost: " << switchCost.timeCost
+                       << " | ProducerWeight: " << switchCost.producerWeight
                        << " | WaitTime: " << switchCost.waitingTime << "s");
             NS_LOG_INFO("");
-            NS_LOG_INFO("Threshold (20% lower): " << thresholdValue);
+            NS_LOG_INFO("Threshold (" << std::setprecision(1) << (m_switchThreshold * 100) << "% lower): " << thresholdValue);
             NS_LOG_INFO("Decision: " << (switchCost.totalCost < thresholdValue ? "SWITCH" : "STAY"));
 
             // 如果切换成本显著更低，则切换
@@ -1094,8 +1140,9 @@ MyProducer::SendNextTask()
                                                    "STAY");
                 }
             }
-        }
-    }
+        } // 结束 if (bestAddress != m_peerAddress)
+    } // 结束 else 分支（对应第985行）
+} // 结束if (m_enablePriceAwareScheduling && m_scheduler)
 
     // 如果已连接，开始发送任务
     m_isSending = true;

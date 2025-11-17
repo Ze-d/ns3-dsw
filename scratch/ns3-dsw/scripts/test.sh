@@ -15,9 +15,17 @@ rm -f "$TEST_OUT_DIR"/*
 # -----------------------------------------------------------------
 # 运行构建，如果成功 (&&)，则运行模拟
 echo "Building ns3..."
-/home/hurun/project/ns3-dsw/ns3 build && \
+# 使用POSIX兼容的方式获取脚本目录
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# 脚本在 scratch/ns3-dsw/scripts/，项目根目录需要上三级
+PARENT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(cd "$PARENT_DIR/.." && pwd)"
+# 切换到项目根目录
+cd "$PROJECT_ROOT" || exit 1
+# 使用绝对路径调用ns3
+"$PROJECT_ROOT/ns3" build && \
 echo "Running ns3 simulation for test..." && \
-/home/hurun/project/ns3-dsw/ns3 run "scratch/ns3-dsw/src/topo_figure_flowmon_cfg_integrated \
+"$PROJECT_ROOT/ns3" run "scratch/ns3-dsw/src/topo_figure_flowmon_cfg_integrated \
 --nodes=scratch/ns3-dsw/data/nodes.csv \
 --links=scratch/ns3-dsw/data/links.csv \
 --warmupTime=0 \

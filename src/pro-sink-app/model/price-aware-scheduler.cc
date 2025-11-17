@@ -20,6 +20,7 @@ TypeId PriceAwareScheduler::GetTypeId(void)
 PriceAwareScheduler::PriceAwareScheduler()
     : m_queuePenaltyFactor(0.1),
       m_loadDecayFactor(0.5),
+      m_producerWeightFactor(0.15),
       m_initialized(false),
       m_xmlLogFile()
 {
@@ -41,14 +42,16 @@ PriceAwareScheduler::~PriceAwareScheduler()
 void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers,
                                      const std::vector<double>& priceProfile,
                                      double queuePenaltyFactor,
-                                     double loadDecayFactor)
+                                     double loadDecayFactor,
+                                     double producerWeightFactor)
 {
-    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor);
+    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor << producerWeightFactor);
 
     m_consumers = consumers;
     m_priceProfile = priceProfile;
     m_queuePenaltyFactor = queuePenaltyFactor;
     m_loadDecayFactor = loadDecayFactor;
+    m_producerWeightFactor = producerWeightFactor;
     m_initialized = true;
 
     // 打开XML日志文件
@@ -70,9 +73,9 @@ void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers
               << "load decay factor " << loadDecayFactor << ".");
 }
 
-Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime)
+Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t producerPendingTasks)
 {
-    NS_LOG_FUNCTION(this << taskArrivalTime);
+    NS_LOG_FUNCTION(this << taskArrivalTime << producerPendingTasks);
 
     if (!m_initialized)
     {
@@ -91,20 +94,28 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime)
     const ConsumerState* bestConsumer = nullptr;
 
     NS_LOG_INFO("========== Scheduling Decision at T=" << taskArrivalTime << "s ==========");
+    NS_LOG_INFO("Producer Pending Tasks: " << producerPendingTasks);
+    NS_LOG_INFO("Producer Weight Factor: " << m_producerWeightFactor);
     NS_LOG_INFO("Evaluating " << m_consumers.size() << " consumers:");
 
-    for (const auto& consumer : m_consumers)
+    for (auto& consumer : m_consumers)
     {
-        CostMetrics metrics = CalculateCost(consumer, taskArrivalTime);
+        // 先更新并获取平滑队列长度（进行"衰减"）
+        double smoothedQueueLength = GetSmoothedQueueLength(consumer);
+
+        // 使用EWMA平滑值计算成本，传递生产者待处理任务数
+        CostMetrics metrics = CalculateCost(consumer, taskArrivalTime, smoothedQueueLength, producerPendingTasks);
 
         InetSocketAddress consumerAddr = InetSocketAddress::ConvertFrom(consumer.sinkAddress);
         NS_LOG_INFO("  Consumer " << consumer.nodeId
                     << " (" << consumerAddr.GetIpv4() << ":8080)"
                     << " - TotalCost: " << std::fixed << std::setprecision(4) << metrics.totalCost
                     << " | ProcessingCost: " << metrics.processingCost
-                    << " | QueuePenalty: " << metrics.queuePenalty
+                    << " | TimeCost: " << metrics.timeCost
+                    << " | ProducerWeight: " << metrics.producerWeight
                     << " | WaitTime: " << std::setprecision(3) << metrics.waitingTime << "s"
-                    << " | TTTT: " << PredictTTTT(consumer).GetSeconds() << "s");
+                    << " | TTTT: " << PredictTTTT(consumer).GetSeconds() << "s"
+                    << " | SmoothedQueue: " << smoothedQueueLength);
 
         if (metrics.totalCost < bestCost)
         {
@@ -141,11 +152,56 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 5. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // 6. 计算队列积压惩罚
+    // 6. 计算队列积压惩罚 - 使用瞬时值（向后兼容）
     metrics.queuePenalty = consumer.currentQueueLength * m_queuePenaltyFactor;
 
     // 7. 总成本
     metrics.totalCost = metrics.processingCost + metrics.queuePenalty;
+
+    return metrics;
+}
+
+CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
+                                               double taskArrivalTime,
+                                               double smoothedQueueLength,
+                                               uint32_t producerPendingTasks)
+{
+    NS_LOG_FUNCTION(this << consumer.nodeId << taskArrivalTime << smoothedQueueLength << producerPendingTasks);
+
+    CostMetrics metrics;
+
+    // 1. 预测TTTT（总任务传输时间）
+    Time predictedTTTT = PredictTTTT(consumer);
+    double arrivalTimeAtConsumer = taskArrivalTime + predictedTTTT.GetSeconds();
+
+    // 2. 计算处理时间
+    double processingTime = CalculateProcessingTime(consumer);
+
+    // 3. 计算队列等待时间 - 使用平滑队列长度
+    double queueWaitTime = smoothedQueueLength * processingTime;
+    metrics.waitingTime = queueWaitTime;
+
+    // 4. 计算任务开始时间
+    double startTime = arrivalTimeAtConsumer + queueWaitTime;
+
+    // 5. 获取该时间点的电价
+    double price = GetPriceAtTime(startTime, consumer.phaseOffsetHours);
+
+    // 6. 计算处理成本
+    metrics.processingCost = price * processingTime;
+
+    // 7. 计算时间成本 = (TTTT + 队列等待时间) * 惩罚系数
+    double totalWaitTime = predictedTTTT.GetSeconds() + queueWaitTime;
+    metrics.timeCost = totalWaitTime * m_queuePenaltyFactor;
+
+    // 8. 计算生产者压力权重
+    metrics.producerWeight = 1.0 + (static_cast<double>(producerPendingTasks) * m_producerWeightFactor);
+
+    // 9. 总成本 = 处理成本 + (时间成本 * 生产者压力权重)
+    metrics.totalCost = metrics.processingCost + (metrics.timeCost * metrics.producerWeight);
+
+    // 10. 保留queuePenalty以向后兼容（实际上已整合到timeCost中）
+    metrics.queuePenalty = metrics.timeCost * metrics.producerWeight;
 
     return metrics;
 }
@@ -237,8 +293,8 @@ double PriceAwareScheduler::CalculateProcessingTime(const ConsumerState& consume
 }
 
 void PriceAwareScheduler::UpdateConsumerState(uint32_t nodeId,
-                                              double utilization,
-                                              uint32_t queueLength)
+                                              const double* utilization,
+                                              const uint32_t* queueLength)
 {
     NS_LOG_FUNCTION(this << nodeId << utilization << queueLength);
 
@@ -246,12 +302,22 @@ void PriceAwareScheduler::UpdateConsumerState(uint32_t nodeId,
     {
         if (consumer.nodeId == nodeId)
         {
-            consumer.currentUtilization = utilization;
-            consumer.currentQueueLength = queueLength;
+            // 只有在指针非空时才更新相应字段
+            if (utilization != nullptr)
+            {
+                consumer.currentUtilization = *utilization;
+            }
+
+            if (queueLength != nullptr)
+            {
+                consumer.currentQueueLength = *queueLength;
+                // 只有在队列长度更新时，才调用EWMA更新
+                UpdateEwmaQueueLength(consumer, *queueLength);
+            }
 
             NS_LOG_DEBUG("Updated Consumer " << nodeId
-                        << ": Util=" << utilization
-                        << ", Queue=" << queueLength);
+                        << ": Util=" << (utilization ? *utilization : -1.0)
+                        << ", Queue=" << (queueLength ? *queueLength : static_cast<uint32_t>(-1)));
             return;
         }
     }
@@ -270,6 +336,13 @@ void PriceAwareScheduler::SetLoadDecayFactor(double factor)
     NS_LOG_FUNCTION(this << factor);
     m_loadDecayFactor = factor;
     NS_LOG_INFO("Load decay factor set to " << m_loadDecayFactor);
+}
+
+void PriceAwareScheduler::SetProducerWeightFactor(double factor)
+{
+    NS_LOG_FUNCTION(this << factor);
+    m_producerWeightFactor = factor;
+    NS_LOG_INFO("Producer weight factor set to " << m_producerWeightFactor);
 }
 
 const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const
@@ -400,6 +473,69 @@ void PriceAwareScheduler::LogSchedulingEvent(uint32_t producerNodeId,
     m_xmlLogFile << "    <Threshold value=\"" << threshold << "\"/>" << std::endl;
     m_xmlLogFile << "  </Event>" << std::endl;
     m_xmlLogFile.flush();  // 确保写入磁盘
+}
+
+void PriceAwareScheduler::UpdateEwmaQueueLength(ConsumerState& consumer, uint32_t queueLength)
+{
+    // 1. 获取当前仿真时间 (秒)
+    double time_now = Simulator::Now().GetSeconds();
+
+    // 2. 获取瞬时队列长度
+    int q_inst = static_cast<int>(queueLength);
+
+    // 3. 计算时间增量 (dt)
+    double dt = time_now - consumer.m_lastQueueUpdateTime;
+
+    if (consumer.m_lastQueueUpdateTime == 0.0 || dt <= 0.0)
+    {
+        // 第一次更新, 或在同一仿真时刻发生多次更新
+        consumer.m_ewmaQueueLength = static_cast<double>(q_inst);
+    }
+    else
+    {
+        // 4. 计算 alpha (基于时间的权重), 确保 #include <cmath>
+        // alpha = 1.0 - exp(-dt / span)
+        double alpha = 1.0 - std::exp(-dt / EWMA_SPAN_SECONDS);
+
+        // 5. 应用 EWMA 公式: new_avg = alpha * new_value + (1 - alpha) * old_avg
+        consumer.m_ewmaQueueLength = (alpha * static_cast<double>(q_inst)) +
+                                      ((1.0 - alpha) * consumer.m_ewmaQueueLength);
+    }
+
+    // 6. 更新时间戳
+    consumer.m_lastQueueUpdateTime = time_now;
+
+    NS_LOG_DEBUG("Consumer " << consumer.nodeId
+                << ": Updated EWMA queue length to " << consumer.m_ewmaQueueLength
+                << " (instantaneous: " << q_inst << ")");
+}
+
+double PriceAwareScheduler::GetSmoothedQueueLength(ConsumerState& consumer)
+{
+    // 【关键步骤】: "衰减"到当前时间
+    // 在两次查询之间, 队列可能长时间未变 (空闲)。
+    // 我们必须计算这段空闲时间的衰减, 否则将返回一个过时的"高"值。
+
+    double time_now = Simulator::Now().GetSeconds();
+    double dt = time_now - consumer.m_lastQueueUpdateTime;
+
+    if (dt > 0.0)
+    {
+        // 队列在这段时间 (dt) 内未变化, 其"瞬时值"被视为当前队列大小
+        int q_inst = static_cast<int>(consumer.currentQueueLength);
+
+        double alpha = 1.0 - std::exp(-dt / EWMA_SPAN_SECONDS);
+
+        // 将 EWMA 值向当前的瞬时值 (q_inst) "衰减"
+        consumer.m_ewmaQueueLength = (alpha * static_cast<double>(q_inst)) +
+                                      ((1.0 - alpha) * consumer.m_ewmaQueueLength);
+
+        consumer.m_lastQueueUpdateTime = time_now;
+    }
+
+    NS_LOG_DEBUG("Consumer " << consumer.nodeId
+                << ": Get smoothed queue length = " << consumer.m_ewmaQueueLength);
+    return consumer.m_ewmaQueueLength;
 }
 
 } // namespace ns3

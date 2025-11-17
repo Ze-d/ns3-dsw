@@ -231,7 +231,7 @@ OnSinkUtilizationForScheduler(uint32_t nodeId, double utilization)
 {
     if (g_scheduler)
     {
-        g_scheduler->UpdateConsumerState(nodeId, utilization, 0);
+        g_scheduler->UpdateConsumerState(nodeId, &utilization, nullptr);
     }
 }
 
@@ -243,7 +243,7 @@ OnSinkQueueLengthForScheduler(uint32_t nodeId, uint32_t queueLength)
 {
     if (g_scheduler)
     {
-        g_scheduler->UpdateConsumerState(nodeId, 0.0, queueLength);
+        g_scheduler->UpdateConsumerState(nodeId, nullptr, &queueLength);
     }
 }
 
@@ -534,10 +534,13 @@ main(int argc, char* argv[])
     if (enablePriceAwareScheduling)
     {
         NS_LOG_INFO("Creating PriceAwareScheduler...");
+        // 生产者压力权重因子默认为0.15（根据TASK.md）
+        double producerWeightFactor = 0.15;
         scheduler = ApplicationManager::CreatePriceAwareScheduler(
-            nodeSpecMap, sinkAddresses, priceProfile, queuePenaltyFactor, loadDecayFactor);
+            nodeSpecMap, sinkAddresses, priceProfile, queuePenaltyFactor, loadDecayFactor, producerWeightFactor);
         g_scheduler = scheduler; // 设置全局变量
-        NS_LOG_INFO("PriceAwareScheduler created successfully with load decay factor " << loadDecayFactor);
+        NS_LOG_INFO("PriceAwareScheduler created successfully with load decay factor " << loadDecayFactor
+                   << " and producer weight factor " << producerWeightFactor);
     }
 
     // 使用 ApplicationManager 安装所有应用

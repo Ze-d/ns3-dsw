@@ -16,6 +16,14 @@
 
 namespace ns3 {
 
+// ----------------------------- 常量定义 -----------------------------
+
+/**
+ * @brief EWMA平滑窗口 (Span)
+ * @details 定义EWMA算法的平滑窗口为1.0秒，用于减少调度器抖动
+ */
+static constexpr double EWMA_SPAN_SECONDS = 1.0;
+
 // ----------------------------- 配置结构 -----------------------------
 enum class NodeType
 {
@@ -47,6 +55,10 @@ struct ConsumerState
     Time m_lastMeasuredRTT;           // 上次测量的RTT
     Time m_lastTTTTTimestamp;         // 上次TTTT测量的时间戳
     double m_K_factor = 1.0;          // K-Factor = TTTT / RTT
+
+    // --- EWMA 队列长度平滑相关 ---
+    double m_ewmaQueueLength = 0.0;      // 队列长度的EWMA平滑值
+    double m_lastQueueUpdateTime = 0.0;  // 上次EWMA更新的仿真时间 (秒)
 };
 
 /**
@@ -57,8 +69,10 @@ struct CostMetrics
 {
     double totalCost = 0.0;        // 总成本
     double processingCost = 0.0;   // 处理成本
-    double queuePenalty = 0.0;     // 队列积压惩罚
+    double timeCost = 0.0;         // 时间成本（TTTT + 队列等待时间）
+    double queuePenalty = 0.0;     // 队列积压惩罚（向后兼容）
     double waitingTime = 0.0;      // 预计等待时间 (秒)
+    double producerWeight = 1.0;   // 生产者压力权重
 };
 
 struct NodeSpec
