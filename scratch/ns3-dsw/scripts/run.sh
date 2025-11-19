@@ -30,6 +30,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 ./ns3 build
+mkdir -p scratch/ns3-dsw/out
 
 # 构建命令参数
 CMD="topo_figure_flowmon_cfg_integrated \
