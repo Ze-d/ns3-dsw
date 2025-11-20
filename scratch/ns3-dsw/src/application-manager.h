@@ -50,18 +50,23 @@ public:
      * @param nodeSpecMap 节点规格映射
      * @param sinkAddresses 消费者地址列表
      * @param priceProfile 电价曲线
-     * @param queuePenaltyFactor 队列惩罚系数
-     * @param loadDecayFactor 负载衰减因子
-     * @param producerWeightFactor 生产者压力权重因子
+     * @param loadDecayFactor 负载衰减因子 (0.0-1.0，默认0.5)
+     * @param maxCongestionPenalty 最大拥塞惩罚 (W_base，默认0.5)
+     * @param congestionSensitivity 拥塞敏感度 (K_c，秒为单位，默认2.0)
+     * @param maxProducerPenalty 最大生产者紧急度乘数 (W_prod，默认3.0)
+     * @param producerSensitivity 生产者敏感度 (K_p，任务数为单位，默认100.0)
      * @return 调度器实例
      */
     static Ptr<PriceAwareScheduler> CreatePriceAwareScheduler(
         const std::map<uint32_t, NodeSpec>& nodeSpecMap,
         const std::vector<Address>& sinkAddresses,
         const std::vector<double>& priceProfile,
-        double queuePenaltyFactor = 0.1,
         double loadDecayFactor = 0.5,
-        double producerWeightFactor = 0.15);
+        double maxCongestionPenalty = 0.5,
+        double congestionSensitivity = 2.0,
+        double maxProducerPenalty = 3.0,
+        double producerSensitivity = 100.0,
+        std::string logFilePath = "scratch/ns3-dsw/out/scheduler_events.xml");
 
 private:
     // 禁用拷贝构造和赋值

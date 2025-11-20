@@ -3,6 +3,7 @@
 """
 调度器事件可视化脚本 (scheduler_events.xml)
 用于分析调度器抖动(Thrashing)现象。
+遵循 CLAUDE.md 规范：使用 Maple Mono Normal NF CN 字体，300 DPI
 
 此脚本假定以下目录结构:
 scratch/ns3-dsw/
@@ -19,7 +20,11 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 from pathlib import Path # 导入 pathlib 用于处理路径
+
+# 导入配置
+import config
 
 def parse_scheduler_events(file_path):
     """
@@ -112,20 +117,35 @@ def create_scheduler_plot(df):
     return plt.gcf()
 
 def main():
+    import os
+
     # --- 路径定义 ---
-    
-    # 1. 获取脚本所在的目录 (即: .../scratch/ns3-dsw/visualization)
+
+    # 1. 获取脚本所在的目录
     script_dir = Path(__file__).resolve().parent
 
-    # 2. 定义相对于脚本目录的输入路径
-    # (../out/scheduler_events.xml)
-    input_file = script_dir / "../out/scheduler_events.xml"
-    
-    # --- 路径修改 ---
-    # 3. 定义输出目录为脚本同级的 "figure" 文件夹
-    # (./figure/)
-    output_dir = script_dir / "../out/visualization/"
-    
+    # ================= 参数解析 =================
+    # 优先使用命令行传进来的参数
+    if len(sys.argv) > 1:
+        # 接收命令行参数 (数据目录)
+        data_dir = Path(sys.argv[1])
+    else:
+        # 检查环境变量
+        env_path = os.environ.get("TARGET_ANALYSIS_DIR")
+        if env_path:
+            data_dir = Path(env_path)
+        else:
+            # 回退到默认路径
+            data_dir = script_dir / '../out'
+
+    print(f"[信息] 数据目录: {data_dir}")
+
+    # 2. 定义输入路径
+    input_file = data_dir / "scheduler_events.xml"
+
+    # 3. 定义输出目录
+    output_dir = data_dir / "visualization/"
+
     # 4. 确保输出目录存在
     output_dir.mkdir(parents=True, exist_ok=True)
     

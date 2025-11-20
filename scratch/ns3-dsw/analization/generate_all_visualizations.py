@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import time
 
-def run_script(script_path):
+def run_script(script_path, data_dir):
     """运行Python脚本并捕获输出"""
     print(f"\n{'='*60}")
     print(f"正在运行: {script_path.name}")
@@ -20,7 +20,7 @@ def run_script(script_path):
 
     try:
         result = subprocess.run(
-            [sys.executable, script_path],
+            [sys.executable, str(script_path), str(data_dir)],
             capture_output=False,
             text=True,
             cwd=script_path.parent
@@ -42,12 +42,30 @@ def run_script(script_path):
 
 def main():
     """主函数"""
+    import os
+
     # 获取当前脚本所在目录
     script_dir = Path(__file__).parent
 
+    # ================= 参数解析 =================
+    # 优先使用命令行传进来的参数
+    if len(sys.argv) > 1:
+        # 接收命令行参数 (数据目录)
+        data_dir = Path(sys.argv[1])
+    else:
+        # 检查环境变量
+        env_path = os.environ.get("TARGET_ANALYSIS_DIR")
+        if env_path:
+            data_dir = Path(env_path)
+        else:
+            # 回退到默认路径
+            data_dir = script_dir / '../out'
+
+    print(f"[信息] 数据目录: {data_dir}")
+
     # 脚本目录（使用相对路径）
     viz_dir = script_dir
-    output_dir = script_dir / '../out/visualization'
+    output_dir = data_dir / 'visualization'
 
     # 确保输出目录存在
     output_dir.mkdir(exist_ok=True)
@@ -72,13 +90,13 @@ def main():
     # 检查数据文件是否存在
     print("\n正在检查数据文件...")
     required_files = [
-        script_dir / '../out/node_util.xml',
-        script_dir / '../out/power_cost_node2.xml',
-        script_dir / '../out/power_cost_node6.xml',
-        script_dir / '../out/power_cost_node9.xml',
-        script_dir / '../out/link_util.xml',
-        script_dir / '../out/pro_sink_stats.xml',
-        script_dir / '../out/scheduler_events.xml'
+        data_dir / 'node_util.xml',
+        data_dir / 'power_cost_node2.xml',
+        data_dir / 'power_cost_node6.xml',
+        data_dir / 'power_cost_node9.xml',
+        data_dir / 'link_util.xml',
+        data_dir / 'pro_sink_stats.xml',
+        data_dir / 'scheduler_events.xml'
     ]
 
     missing_files = [f for f in required_files if not Path(f).exists()]
@@ -101,7 +119,7 @@ def main():
     for script_name in scripts:
         script_path = viz_dir / script_name
         if script_path.exists():
-            if run_script(script_path):
+            if run_script(script_path, data_dir):
                 success_count += 1
             else:
                 failed_scripts.append(script_name)

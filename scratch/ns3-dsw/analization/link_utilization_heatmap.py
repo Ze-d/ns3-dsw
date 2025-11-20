@@ -4,12 +4,14 @@
 链路占用率热力图生成器
 从 link_util.xml 文件中提取所有链路的利用率数据，
 生成热力图显示 40 个链路方向的占用率变化。
+遵循 CLAUDE.md 规范：使用 Maple Mono Normal NF CN 字体，300 DPI
 """
 
 import xml.etree.ElementTree as ET
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 from pathlib import Path
 
 # 导入配置
@@ -126,12 +128,30 @@ def plot_link_utilization_heatmap(heatmap_data, directions, times, output_path):
     plt.close()
 
 def main():
+    import os
+
     # 获取当前脚本所在目录
     script_dir = Path(__file__).parent
 
+    # ================= 参数解析 =================
+    # 优先使用命令行传进来的参数
+    if len(sys.argv) > 1:
+        # 接收命令行参数 (数据目录)
+        data_dir = Path(sys.argv[1])
+    else:
+        # 检查环境变量
+        env_path = os.environ.get("TARGET_ANALYSIS_DIR")
+        if env_path:
+            data_dir = Path(env_path)
+        else:
+            # 回退到默认路径
+            data_dir = script_dir / '../out'
+
+    print(f"[信息] 数据目录: {data_dir}")
+
     # 文件路径（使用相对路径）
-    input_file = script_dir / '../out/link_util.xml'
-    output_dir = script_dir / '../out/visualization'
+    input_file = data_dir / 'link_util.xml'
+    output_dir = data_dir / 'visualization'
     output_dir.mkdir(exist_ok=True)
     output_file = output_dir / 'link_utilization_heatmap.png'
 

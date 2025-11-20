@@ -18,9 +18,11 @@ TypeId PriceAwareScheduler::GetTypeId(void)
 }
 
 PriceAwareScheduler::PriceAwareScheduler()
-    : m_queuePenaltyFactor(0.1),
-      m_loadDecayFactor(0.5),
-      m_producerWeightFactor(0.15),
+    : m_loadDecayFactor(0.5),
+      m_maxCongestionPenalty(0.5),
+      m_congestionSensitivity(2.0),
+      m_maxProducerPenalty(3.0),
+      m_producerSensitivity(100.0),
       m_initialized(false),
       m_xmlLogFile()
 {
@@ -41,36 +43,45 @@ PriceAwareScheduler::~PriceAwareScheduler()
 
 void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers,
                                      const std::vector<double>& priceProfile,
-                                     double queuePenaltyFactor,
                                      double loadDecayFactor,
-                                     double producerWeightFactor)
+                                     double maxCongestionPenalty,
+                                     double congestionSensitivity,
+                                     double maxProducerPenalty,
+                                     double producerSensitivity,
+                                     std::string logFilePath)
 {
-    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor << producerWeightFactor);
+    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << loadDecayFactor);
 
     m_consumers = consumers;
     m_priceProfile = priceProfile;
-    m_queuePenaltyFactor = queuePenaltyFactor;
     m_loadDecayFactor = loadDecayFactor;
-    m_producerWeightFactor = producerWeightFactor;
+    m_maxCongestionPenalty = maxCongestionPenalty;
+    m_congestionSensitivity = congestionSensitivity;
+    m_maxProducerPenalty = maxProducerPenalty;
+    m_producerSensitivity = producerSensitivity;
     m_initialized = true;
 
     // 打开XML日志文件
-    m_xmlLogFile.open("scratch/ns3-dsw/out/scheduler_events.xml", std::ios::out | std::ios::trunc);
+    m_xmlLogFile.open(logFilePath, std::ios::out | std::ios::trunc);
     if (m_xmlLogFile.is_open())
     {
         m_xmlLogFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
         m_xmlLogFile << "<SchedulerEvents>" << std::endl;
         m_xmlLogFile << std::fixed << std::setprecision(6);
-        NS_LOG_INFO("Scheduler XML log opened: scratch/ns3-dsw/out/scheduler_events.xml");
+        NS_LOG_INFO("Scheduler XML log opened: " << logFilePath);
     }
     else
     {
-        NS_LOG_WARN("Failed to open scheduler XML log file");
+        NS_LOG_WARN("Failed to open scheduler XML log file at: " << logFilePath);
     }
 
     NS_LOG_INFO("PriceAwareScheduler initialized with " << m_consumers.size()
               << " consumers, " << m_priceProfile.size() << " price points, "
-              << "load decay factor " << loadDecayFactor << ".");
+              << "load decay factor " << loadDecayFactor
+              << ", max congestion penalty " << maxCongestionPenalty
+              << ", congestion sensitivity " << congestionSensitivity << "s"
+              << ", max producer penalty " << maxProducerPenalty
+              << ", producer sensitivity " << producerSensitivity << " tasks.");
 }
 
 Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t producerPendingTasks)
@@ -95,7 +106,6 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t p
 
     NS_LOG_INFO("========== Scheduling Decision at T=" << taskArrivalTime << "s ==========");
     NS_LOG_INFO("Producer Pending Tasks: " << producerPendingTasks);
-    NS_LOG_INFO("Producer Weight Factor: " << m_producerWeightFactor);
     NS_LOG_INFO("Evaluating " << m_consumers.size() << " consumers:");
 
     for (auto& consumer : m_consumers)
@@ -152,11 +162,21 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 5. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // 6. 计算队列积压惩罚 - 使用瞬时值（向后兼容）
-    metrics.queuePenalty = consumer.currentQueueLength * m_queuePenaltyFactor;
+    // 6. 使用简化的时间成本计算（不考虑生产者压力）
+    // 这个方法主要用于向后兼容，实际调度使用带smoothedQueueLength的版本
+    Time predictedTTTT = PredictTTTT(consumer);
+    double queueWaitTime = consumer.currentQueueLength * processingTime;
+    double T_delay = predictedTTTT.GetSeconds() + queueWaitTime;
 
-    // 7. 总成本
-    metrics.totalCost = metrics.processingCost + metrics.queuePenalty;
+    // 基础拥塞成本（归一化）
+    double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
+    metrics.timeCost = Cost_cong;
+
+    // 7. 总成本（不包含生产者压力）
+    metrics.totalCost = metrics.processingCost + metrics.timeCost;
+
+    // 8. 保留queuePenalty以向后兼容
+    metrics.queuePenalty = metrics.timeCost;
 
     return metrics;
 }
@@ -190,18 +210,28 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 6. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // 7. 计算时间成本 = (TTTT + 队列等待时间) * 惩罚系数
-    double totalWaitTime = predictedTTTT.GetSeconds() + queueWaitTime;
-    metrics.timeCost = totalWaitTime * m_queuePenaltyFactor;
+    // ===== Tanh归一化成本函数 =====
 
-    // 8. 计算生产者压力权重
-    metrics.producerWeight = 1.0 + (static_cast<double>(producerPendingTasks) * m_producerWeightFactor);
+    // 7. 计算总延迟 T_delay = TTTT + queueWaitTime
+    double T_delay = predictedTTTT.GetSeconds() + queueWaitTime;
 
-    // 9. 总成本 = 处理成本 + (时间成本 * 生产者压力权重)
-    metrics.totalCost = metrics.processingCost + (metrics.timeCost * metrics.producerWeight);
+    // 8. 计算基础拥塞成本（归一化）
+    // Cost_cong = m_maxCongestionPenalty * tanh(T_delay / m_congestionSensitivity)
+    double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
 
-    // 10. 保留queuePenalty以向后兼容（实际上已整合到timeCost中）
-    metrics.queuePenalty = metrics.timeCost * metrics.producerWeight;
+    // 9. 计算生产者紧急度乘数（归一化）
+    // Multiplier = 1.0 + (m_maxProducerPenalty * tanh(ProducerPending / m_producerSensitivity))
+    double Multiplier = 1.0 + (m_maxProducerPenalty * std::tanh(static_cast<double>(producerPendingTasks) / m_producerSensitivity));
+    metrics.producerWeight = Multiplier;
+
+    // 10. 计算最终时间成本
+    metrics.timeCost = Cost_cong * Multiplier;
+
+    // 11. 计算总成本 = 处理成本 + 时间成本
+    metrics.totalCost = metrics.processingCost + metrics.timeCost;
+
+    // 12. 保留queuePenalty以向后兼容（设置为时间成本）
+    metrics.queuePenalty = metrics.timeCost;
 
     return metrics;
 }
@@ -325,24 +355,11 @@ void PriceAwareScheduler::UpdateConsumerState(uint32_t nodeId,
     NS_LOG_WARN("Consumer with nodeId " << nodeId << " not found!");
 }
 
-void PriceAwareScheduler::SetQueuePenaltyFactor(double factor)
-{
-    NS_LOG_FUNCTION(this << factor);
-    m_queuePenaltyFactor = factor;
-}
-
 void PriceAwareScheduler::SetLoadDecayFactor(double factor)
 {
     NS_LOG_FUNCTION(this << factor);
     m_loadDecayFactor = factor;
     NS_LOG_INFO("Load decay factor set to " << m_loadDecayFactor);
-}
-
-void PriceAwareScheduler::SetProducerWeightFactor(double factor)
-{
-    NS_LOG_FUNCTION(this << factor);
-    m_producerWeightFactor = factor;
-    NS_LOG_INFO("Producer weight factor set to " << m_producerWeightFactor);
 }
 
 const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const
