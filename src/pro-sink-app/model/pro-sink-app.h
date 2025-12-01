@@ -44,8 +44,12 @@ public:
     void SetTimestamp(Time timestamp);
     Time GetTimestamp() const;
 
+    void SetNodeId(uint32_t nodeId);
+    uint32_t GetNodeId() const;
+
 private:
     Time m_timestamp;
+    uint32_t m_nodeId;
 };
 
 } // namespace ns3

@@ -45,7 +45,7 @@ echo "Running ns3 simulation for test..." && \
 --congestionSensitivity=2.0 \
 --maxProducerPenalty=3.0 \
 --producerSensitivity=100.0 \
---schedulerLogPath= $TEST_OUT_DIR/scheduler_events.xml \
+--schedulerLogPath=$TEST_OUT_DIR/scheduler_events.xml \
 "
 
 # 捕获上面命令链的最终退出状态

@@ -133,6 +133,13 @@ public:
     void ReportRTTMeasured(Address consumerAddress, Time rtt);
 
     /**
+     * @brief 报告RTT测量结果（使用NodeId）
+     * @param nodeId 消费者节点ID
+     * @param rtt RTT测量值
+     */
+    void ReportRTTMeasured(uint32_t nodeId, Time rtt);
+
+    /**
      * @brief 记录调度事件到XML文件
      * @param producerNodeId 生产者节点ID
      * @param taskArrivalTime 任务到达时间

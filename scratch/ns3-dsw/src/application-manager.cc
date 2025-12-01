@@ -123,6 +123,9 @@ ApplicationManager::InstallProSinkApps(
                                proPacketSize,
                                simulationStep);
 
+            // 设置所有消费者地址池（用于RTT探测）
+            producerApp->SetConsumerAddresses(sinkAddresses);
+
             // 同样设置 Attribute (与 example 保持一致)
             producerApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             producerApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));

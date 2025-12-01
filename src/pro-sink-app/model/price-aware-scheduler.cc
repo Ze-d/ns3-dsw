@@ -117,6 +117,7 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t p
         CostMetrics metrics = CalculateCost(consumer, taskArrivalTime, smoothedQueueLength, producerPendingTasks);
 
         InetSocketAddress consumerAddr = InetSocketAddress::ConvertFrom(consumer.sinkAddress);
+        Time predictedTttt = PredictTTTT(consumer);
         NS_LOG_INFO("  Consumer " << consumer.nodeId
                     << " (" << consumerAddr.GetIpv4() << ":8080)"
                     << " - TotalCost: " << std::fixed << std::setprecision(4) << metrics.totalCost
@@ -124,7 +125,7 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t p
                     << " | TimeCost: " << metrics.timeCost
                     << " | ProducerWeight: " << metrics.producerWeight
                     << " | WaitTime: " << std::setprecision(3) << metrics.waitingTime << "s"
-                    << " | TTTT: " << PredictTTTT(consumer).GetSeconds() << "s"
+                    << " | TTTT: " << predictedTttt.GetSeconds() << "s"
                     << " | SmoothedQueue: " << smoothedQueueLength);
 
         if (metrics.totalCost < bestCost)
@@ -346,8 +347,10 @@ void PriceAwareScheduler::UpdateConsumerState(uint32_t nodeId,
             }
 
             NS_LOG_DEBUG("Updated Consumer " << nodeId
-                        << ": Util=" << (utilization ? *utilization : -1.0)
-                        << ", Queue=" << (queueLength ? *queueLength : static_cast<uint32_t>(-1)));
+                        << " State: Util=" << consumer.currentUtilization  
+                        << ", Queue=" << consumer.currentQueueLength       
+                        << " (Input: Util=" << (utilization ? "Set" : "Skip") 
+                        << ", Queue=" << (queueLength ? "Set" : "Skip") << ")");
             return;
         }
     }
@@ -369,8 +372,6 @@ const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const
 
 void PriceAwareScheduler::ReportTTTTMeasured(Address consumerAddress, Time tttt)
 {
-    NS_LOG_FUNCTION(this << consumerAddress << tttt.GetSeconds());
-
     for (auto& consumer : m_consumers)
     {
         if (consumer.sinkAddress == consumerAddress)
@@ -378,14 +379,37 @@ void PriceAwareScheduler::ReportTTTTMeasured(Address consumerAddress, Time tttt)
             consumer.m_lastMeasuredTTTT = tttt;
             consumer.m_lastTTTTTimestamp = Simulator::Now();
 
-            NS_LOG_INFO("TTTT measured for consumer " << consumer.nodeId
-                      << ": " << tttt.GetSeconds() << "s");
+            // 1. 安全检查：防止除以零
+            if (consumer.m_lastMeasuredRTT.IsZero()) {
+                 NS_LOG_WARN("RTT is zero, cannot update K-factor for node " << consumer.nodeId);
+                 return; 
+            }
+
+            // 2. 计算瞬时 K 值
+            double currentK = tttt.GetSeconds() / consumer.m_lastMeasuredRTT.GetSeconds();
+
+            // 3. 异常值过滤 (Sanity Check)
+            // K因子理论上不应小于1（任务时间不可能短于RTT），也不应过大（除非断网）
+            // 这里设置一个宽松的范围，比如 [1.0, 1000.0]
+            if (currentK < 1.0) currentK = 1.0; 
+            
+            // 4. EWMA 平滑更新 (Alpha 通常取 0.125 或 0.25)
+            // 新值占 0.25，历史值占 0.75，防止 K 值剧烈抖动
+            double alpha = 0.25;
+            if (consumer.m_K_factor == 1.0) { 
+                // 如果是第一次（假设初值为1.0），直接赋值，不要平滑
+                consumer.m_K_factor = currentK;
+            } else {
+                consumer.m_K_factor = (1.0 - alpha) * consumer.m_K_factor + alpha * currentK;
+            }
+
+            NS_LOG_INFO("Updated K-Factor for consumer " << consumer.nodeId
+                      << ": Raw=" << currentK 
+                      << ", Smoothed=" << consumer.m_K_factor);
 
             return;
         }
     }
-
-    NS_LOG_WARN("Consumer with address " << consumerAddress << " not found!");
 }
 
 void PriceAwareScheduler::ReportRTTMeasured(Address consumerAddress, Time rtt)
@@ -398,7 +422,7 @@ void PriceAwareScheduler::ReportRTTMeasured(Address consumerAddress, Time rtt)
         {
             consumer.m_lastMeasuredRTT = rtt;
 
-            NS_LOG_INFO("RTT measured for consumer " << consumer.nodeId
+            NS_LOG_DEBUG("RTT measured for consumer " << consumer.nodeId
                       << ": " << rtt.GetSeconds() << "s");
 
             return;
@@ -406,6 +430,26 @@ void PriceAwareScheduler::ReportRTTMeasured(Address consumerAddress, Time rtt)
     }
 
     NS_LOG_WARN("Consumer with address " << consumerAddress << " not found!");
+}
+
+void PriceAwareScheduler::ReportRTTMeasured(uint32_t nodeId, Time rtt)
+{
+    NS_LOG_FUNCTION(this << nodeId << rtt.GetSeconds());
+
+    for (auto& consumer : m_consumers)
+    {
+        if (consumer.nodeId == nodeId)
+        {
+            consumer.m_lastMeasuredRTT = rtt;
+
+            NS_LOG_DEBUG("RTT measured for consumer " << consumer.nodeId
+                      << ": " << rtt.GetSeconds() << "s");
+
+            return;
+        }
+    }
+
+    NS_LOG_WARN("Consumer with Node ID " << nodeId << " not found!");
 }
 
 Time PriceAwareScheduler::PredictTTTT(const ConsumerState& consumer) const

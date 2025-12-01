@@ -158,12 +158,12 @@ def main():
     print(f"共解析 {len(df)} 条 EdgeSend 记录")
 
     print("正在按时间窗口聚合数据...")
-    window_data = aggregate_by_time_window(df, window_size=0.25)
+    window_data = aggregate_by_time_window(df, window_size=1)
     print(f"聚合为 {len(window_data['TimeWindow'].unique())} 个时间窗口 (1s 窗口)")
 
     print("正在应用 2.5s 平滑...")
     # 2.5秒平滑需要2.5个1s窗口，使用3个窗口（3秒）近似
-    pivot_data = apply_smoothing(window_data, span=1)
+    pivot_data = apply_smoothing(window_data, span=3)
 
     print("正在生成堆积面积图...")
     plot_stacked_area_chart(pivot_data, output_file)
