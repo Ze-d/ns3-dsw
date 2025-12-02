@@ -3,14 +3,9 @@
 # ==========================================
 # 配置区域
 # ==========================================
-AUTHOR_NAME="Default"  # 你可以在这里修改作者名字
+AUTHOR_NAME="ns3"  # 你可以在这里修改作者名字
 BASE_OUT_DIR="scratch/ns3-dsw/out"
 DATA_DIR="scratch/ns3-dsw/data"
-
-# 获取当前时间戳 (格式: YYYYMMDD_HHMMSS)
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-# 创建本次运行的专属输出目录
-CURRENT_OUT_DIR="${BASE_OUT_DIR}/${TIMESTAMP}"
 
 # ==========================================
 # 参数解析
@@ -23,8 +18,15 @@ MAX_PRODUCER_PENALTY=3.0
 PRODUCER_SENSITIVITY=100.0
 LOG_LEVEL="off"
 
+# 新增：用于存储用户自定义的子文件夹名
+CUSTOM_SUBDIR=""
+
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --outputDir)
+            CUSTOM_SUBDIR="$2"
+            shift 2
+            ;;
         --enablePriceAwareScheduling)
             ENABLE_PRICE_SCHEDULING="$2"
             shift 2
@@ -58,28 +60,57 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
+            echo "Unknown option: $1"
             shift
             ;;
     esac
 done
 
 # ==========================================
+# 确定输出目录 (核心修改逻辑)
+# ==========================================
+
+# 如果用户没有指定自定义文件夹，则使用时间戳 (默认行为)
+if [ -z "$CUSTOM_SUBDIR" ]; then
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    # 为了防止时间戳重名，可以加个随机数后缀（可选）
+    CURRENT_OUT_DIR="${BASE_OUT_DIR}/${TIMESTAMP}"
+else
+    # 如果用户指定了文件夹，直接使用
+    # 注意：这里支持多级目录，例如 grid_results/test1
+    CURRENT_OUT_DIR="${BASE_OUT_DIR}/${CUSTOM_SUBDIR}"
+fi
+
+# ==========================================
 # 准备环境
 # ==========================================
 
-# 确保输出目录存在
-mkdir -p "$CURRENT_OUT_DIR"
+# 1. 定义关键变量
+SIM_DURATION=24
+INFO_FILE="${CURRENT_OUT_DIR}/run_info.txt"
+LOG_FILE="${CURRENT_OUT_DIR}/console_output.log"
 
-# 编译 (如果有改动)
+# 2. 确保输出目录存在
+if [ ! -d "$CURRENT_OUT_DIR" ]; then
+    echo "Creating output directory: $CURRENT_OUT_DIR"
+    mkdir -p "$CURRENT_OUT_DIR"
+    
+    # 双重检查
+    if [ ! -d "$CURRENT_OUT_DIR" ]; then
+        echo "Error: Failed to create directory $CURRENT_OUT_DIR. Aborting."
+        exit 1
+    fi
+fi
+
+# 3. 编译
 ./ns3 build
 
-# 构建命令参数
-# 注意：所有的输出路径现在都指向 $CURRENT_OUT_DIR
+# 4. 构建命令参数
 CMD="topo_figure_flowmon_cfg_integrated \
 --nodes=${DATA_DIR}/nodes.csv \
 --links=${DATA_DIR}/links.csv \
---warmupTime=6 \
---simDuration=24 \
+--warmupTime=0 \
+--simDuration=${SIM_DURATION} \
 --pcap=0 \
 --anim=1 \
 --flowXml=${CURRENT_OUT_DIR}/flowmon.xml \
@@ -111,87 +142,112 @@ CMD="topo_figure_flowmon_cfg_integrated \
 --log=$LOG_LEVEL"
 
 # ==========================================
-# 生成运行信息报告 (Run Info Report)
+# 生成运行信息报告
 # ==========================================
-INFO_FILE="${CURRENT_OUT_DIR}/run_info.txt"
-
 echo "Generating run info at: $INFO_FILE"
 
 cat <<EOF > "$INFO_FILE"
 ==========================================================
 NS-3 Simulation Run Report
 ==========================================================
-Run ID (Timestamp) : $TIMESTAMP
+Run ID (Timestamp) : ${TIMESTAMP:-Custom_Dir}
 Run Date           : $(date)
 Output Directory   : $CURRENT_OUT_DIR
 Author             : $AUTHOR_NAME
 System Info        : $(uname -sr)
-
+Target Duration    : $SIM_DURATION seconds
 ----------------------------------------------------------
 Simulation Parameters
 ----------------------------------------------------------
 Price-Aware Scheduling : $ENABLE_PRICE_SCHEDULING
 Load Decay Factor      : $LOAD_DECAY_FACTOR
 Max Congestion Penalty : $MAX_CONGESTION_PENALTY
-Congestion Sensitivity : $CONGESTION_SENSITIVITY (s)
+Congestion Sensitivity : $CONGESTION_SENSITIVITY
 Max Producer Penalty   : $MAX_PRODUCER_PENALTY
-Producer Sensitivity   : $PRODUCER_SENSITIVITY (tasks)
+Producer Sensitivity   : $PRODUCER_SENSITIVITY
 Log Level              : $LOG_LEVEL
-
 ----------------------------------------------------------
-Input Data Sources
-----------------------------------------------------------
-Nodes File : ${DATA_DIR}/nodes.csv
-Links File : ${DATA_DIR}/links.csv
-Price File : ${DATA_DIR}/daily_price.csv
-
-----------------------------------------------------------
-Full Execution Command
-----------------------------------------------------------
-./ns3 run "$CMD"
-
+CMD : ./ns3 run $CMD
 EOF
 
 # ==========================================
-# 终端输出与执行
+# 执行仿真
 # ==========================================
 echo "================================================"
 echo "动态成本感知调度仿真 (Dynamic Cost-Aware Scheduling)"
-echo "================================================"
 echo "Output Folder: $CURRENT_OUT_DIR"
-echo "Run Info File: $INFO_FILE"
-echo "Log Level:     $LOG_LEVEL"
-
-if [ "$LOG_LEVEL" != "off" ]; then
-    echo ""
-    echo "提示：终端日志也将被保存到: ${CURRENT_OUT_DIR}/console_output.log"
-fi
 echo "================================================"
-echo ""
 
-# 定义日志文件路径
-LOG_FILE="${CURRENT_OUT_DIR}/console_output.log"
-
-# 执行仿真
-# 使用 tee 命令：既在屏幕显示，又写入文件
-# 2>&1 确保错误输出也能被捕获
+START_TIME=$(date +%s)
 
 if [ "$LOG_LEVEL" = "off" ]; then
-    # 静默模式：只记录到文件，或者完全丢弃（此处选择记录到文件以便排查错误，但不输出到屏幕）
-    NS_LOG_DISABLE=all ./ns3 run "$CMD" > "$LOG_FILE" 2>&1
-    echo "仿真完成。日志已静默写入 $LOG_FILE"
-
-elif [ "$LOG_LEVEL" = "all" ]; then
-    # 启用所有日志
-    NS_LOG_ENABLE=all ./ns3 run "$CMD" 2>&1 | tee "$LOG_FILE"
-
+    NS_LOG_DISABLE=all ./ns3 run "$CMD" > "$LOG_FILE" 2>&1 &
 else
-    # 指定日志级别
-    NS_LOG_COMPONENTS="$LOG_LEVEL" ./ns3 run "$CMD" 2>&1 | tee "$LOG_FILE"
+    if [ "$LOG_LEVEL" = "all" ]; then
+        export NS_LOG_ENABLE=all
+    else
+        export NS_LOG="$LOG_LEVEL"
+    fi
+    ./ns3 run "$CMD" > "$LOG_FILE" 2>&1 &
 fi
 
-echo ""
+# 1. 定义清理函数：恢复光标可见，恢复输入回显
+cleanup() {
+    tput cnorm   # 恢复光标 (cursor normal)
+    stty echo    # 恢复输入回显
+}
+
+# 2. 捕捉信号：无论是脚本跑完还是用户按 Ctrl+C，都执行 cleanup
+trap cleanup EXIT INT TERM
+
+# 3. 初始化设置：隐藏光标，关闭回显
+tput civis       # 隐藏光标 (cursor invisible)
+stty -echo       # 关闭输入回显 (no echo)
+
+SIM_PID=$!
+BAR_WIDTH=40
+echo "" 
+
+while kill -0 $SIM_PID 2>/dev/null; do
+    CURRENT_REAL_TIME=$(date +%s)
+    ELAPSED_SEC=$((CURRENT_REAL_TIME - START_TIME))
+    ELAPSED_MIN=$((ELAPSED_SEC / 60))
+    ELAPSED_REM_SEC=$((ELAPSED_SEC % 60))
+    
+    # 尝试从日志读取进度
+    CURRENT_TIME_STR=$(tail -n 20 "$LOG_FILE" 2>/dev/null | grep -oE "^[0-9]+(\.[0-9]+)?s:" | tail -n 1 | tr -d 's:')
+
+    if [ -n "$CURRENT_TIME_STR" ]; then
+        PERCENT=$(awk -v cur="$CURRENT_TIME_STR" -v tot="$SIM_DURATION" 'BEGIN { if (tot>0) printf "%.0f", (cur/tot)*100; else print 0 }')
+        if [ "$PERCENT" -gt 100 ]; then PERCENT=100; fi
+
+        FILL_LEN=$(awk -v p="$PERCENT" -v w="$BAR_WIDTH" 'BEGIN { printf "%.0f", (p/100)*w }')
+        BAR=$(printf "%0.s#" $(seq 1 $FILL_LEN))
+        EMPTY=$(printf "%0.s-" $(seq 1 $((BAR_WIDTH - FILL_LEN))))
+        
+        printf "\r\033[K[%s%s] %3s%% | Sim: %6ss | Real: %02d:%02d" "$BAR" "$EMPTY" "$PERCENT" "$CURRENT_TIME_STR" "$ELAPSED_MIN" "$ELAPSED_REM_SEC"
+    # else
+    #     printf "\r\033[K[Initializing...] Waiting for output... | Real: %02d:%02d" "$ELAPSED_MIN" "$ELAPSED_REM_SEC"
+    fi
+    sleep 1
+done
+
+wait $SIM_PID
+EXIT_CODE=$?
+
+END_TIME=$(date +%s)
+TOTAL_SEC=$((END_TIME - START_TIME))
+TOTAL_MIN=$((TOTAL_SEC / 60))
+TOTAL_REM_SEC=$((TOTAL_SEC % 60))
+
+echo "" 
 echo "================================================"
-echo "Run Finished."
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "Run Finished Successfully."
+else
+    echo "Run Failed with exit code $EXIT_CODE."
+    echo "Check log for errors: $LOG_FILE"
+fi
 echo "Results saved in: $CURRENT_OUT_DIR"
 echo "================================================"

@@ -122,9 +122,9 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t p
                     << " (" << consumerAddr.GetIpv4() << ":8080)"
                     << " - TotalCost: " << std::fixed << std::setprecision(4) << metrics.totalCost
                     << " | ProcessingCost: " << metrics.processingCost
-                    << " | TimeCost: " << metrics.timeCost
-                    << " | ProducerWeight: " << metrics.producerWeight
-                    << " | WaitTime: " << std::setprecision(3) << metrics.waitingTime << "s"
+                    << " | CongestionCost: " << metrics.congestionCost
+                    << " | ProducerMultiplier: " << metrics.producerMultiplier
+                    << " | T_delay: " << std::setprecision(3) << metrics.timeDelay << "s"
                     << " | TTTT: " << predictedTttt.GetSeconds() << "s"
                     << " | SmoothedQueue: " << smoothedQueueLength);
 
@@ -155,15 +155,12 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     double processingTime = CalculateProcessingTime(consumer);
 
     // 3. 计算等待时间
-    metrics.waitingTime = startTime - taskArrivalTime;
+    double waitingTime = startTime - taskArrivalTime;
 
     // 4. 获取该时间点的电价
     double price = GetPriceAtTime(startTime, consumer.phaseOffsetHours);
 
-    // 5. 计算处理成本
-    metrics.processingCost = price * processingTime;
-
-    // 6. 使用简化的时间成本计算（不考虑生产者压力）
+    // 5. 使用简化的时间成本计算（不考虑生产者压力）
     // 这个方法主要用于向后兼容，实际调度使用带smoothedQueueLength的版本
     Time predictedTTTT = PredictTTTT(consumer);
     double queueWaitTime = consumer.currentQueueLength * processingTime;
@@ -171,13 +168,38 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
 
     // 基础拥塞成本（归一化）
     double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
-    metrics.timeCost = Cost_cong;
 
-    // 7. 总成本（不包含生产者压力）
-    metrics.totalCost = metrics.processingCost + metrics.timeCost;
+    // ===== 保存中间计算值到metrics结构体 =====
 
-    // 8. 保留queuePenalty以向后兼容
-    metrics.queuePenalty = metrics.timeCost;
+    // 底层参数
+    metrics.TTTT = predictedTTTT.GetSeconds();
+    metrics.processingTime = processingTime;
+    metrics.smoothedQueueLength = consumer.currentQueueLength;
+    metrics.pendingTasks = 0; // 简化版本不考虑生产者压力
+    metrics.queueWaitTime = queueWaitTime;
+    metrics.waitingTime = waitingTime;
+
+    // 中间计算参数
+    metrics.taskStartTime = startTime;
+    metrics.priceAtStart = price;
+    metrics.timeDelay = T_delay;
+    metrics.baseCongestionCost = Cost_cong;
+
+    // 生产者紧急度乘数（简化版本为1.0）
+    metrics.producerMultiplier = 1.0;
+    metrics.producerWeight = 1.0;
+
+    // 6. 计算处理成本
+    metrics.processingCost = price * processingTime;
+
+    // 计算最终拥塞成本 = 基础拥塞成本 × 紧急度乘数（简化版本中乘数为1.0）
+    metrics.congestionCost = Cost_cong;
+
+    // 计算总成本 = 处理成本 + 拥塞成本
+    metrics.totalCost = metrics.processingCost + metrics.congestionCost;
+
+    // 保留queuePenalty以向后兼容
+    metrics.queuePenalty = metrics.congestionCost;
 
     return metrics;
 }
@@ -200,7 +222,6 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
 
     // 3. 计算队列等待时间 - 使用平滑队列长度
     double queueWaitTime = smoothedQueueLength * processingTime;
-    metrics.waitingTime = queueWaitTime;
 
     // 4. 计算任务开始时间
     double startTime = arrivalTimeAtConsumer + queueWaitTime;
@@ -208,31 +229,46 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 5. 获取该时间点的电价
     double price = GetPriceAtTime(startTime, consumer.phaseOffsetHours);
 
+    // ===== 保存中间计算值到metrics结构体 =====
+
+    // 底层参数
+    metrics.TTTT = predictedTTTT.GetSeconds();
+    metrics.processingTime = processingTime;
+    metrics.smoothedQueueLength = smoothedQueueLength;
+    metrics.pendingTasks = producerPendingTasks;
+    metrics.queueWaitTime = queueWaitTime;
+    metrics.waitingTime = queueWaitTime;
+
+    // 中间计算参数
+    metrics.taskStartTime = startTime;
+    metrics.priceAtStart = price;
+
+    // 计算总延迟 T_delay = TTTT + queueWaitTime
+    double T_delay = predictedTTTT.GetSeconds() + queueWaitTime;
+    metrics.timeDelay = T_delay;
+
+    // 计算基础拥塞成本（归一化）
+    // Cost_cong = m_maxCongestionPenalty * tanh(T_delay / m_congestionSensitivity)
+    double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
+    metrics.baseCongestionCost = Cost_cong;
+
+    // 计算生产者紧急度乘数（归一化）
+    // Multiplier = 1.0 + (m_maxProducerPenalty * tanh(ProducerPending / m_producerSensitivity))
+    double Multiplier = 1.0 + (m_maxProducerPenalty * std::tanh(static_cast<double>(producerPendingTasks) / m_producerSensitivity));
+    metrics.producerMultiplier = Multiplier;
+    metrics.producerWeight = Multiplier; // 向后兼容
+
     // 6. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // ===== Tanh归一化成本函数 =====
+    // 计算最终拥塞成本 = 基础拥塞成本 × 紧急度乘数
+    metrics.congestionCost = Cost_cong * Multiplier;
 
-    // 7. 计算总延迟 T_delay = TTTT + queueWaitTime
-    double T_delay = predictedTTTT.GetSeconds() + queueWaitTime;
+    // 计算总成本 = 处理成本 + 拥塞成本
+    metrics.totalCost = metrics.processingCost + metrics.congestionCost;
 
-    // 8. 计算基础拥塞成本（归一化）
-    // Cost_cong = m_maxCongestionPenalty * tanh(T_delay / m_congestionSensitivity)
-    double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
-
-    // 9. 计算生产者紧急度乘数（归一化）
-    // Multiplier = 1.0 + (m_maxProducerPenalty * tanh(ProducerPending / m_producerSensitivity))
-    double Multiplier = 1.0 + (m_maxProducerPenalty * std::tanh(static_cast<double>(producerPendingTasks) / m_producerSensitivity));
-    metrics.producerWeight = Multiplier;
-
-    // 10. 计算最终时间成本
-    metrics.timeCost = Cost_cong * Multiplier;
-
-    // 11. 计算总成本 = 处理成本 + 时间成本
-    metrics.totalCost = metrics.processingCost + metrics.timeCost;
-
-    // 12. 保留queuePenalty以向后兼容（设置为时间成本）
-    metrics.queuePenalty = metrics.timeCost;
+    // 保留queuePenalty以向后兼容（设置为拥塞成本）
+    metrics.queuePenalty = metrics.congestionCost;
 
     return metrics;
 }
@@ -517,19 +553,55 @@ void PriceAwareScheduler::LogSchedulingEvent(uint32_t producerNodeId,
                  << " producerNode=\"" << producerNodeId << "\""
                  << " decision=\"" << decision << "\">" << std::endl;
 
+    // ========== CurrentTarget 详细信息 ==========
     m_xmlLogFile << "    <CurrentTarget nodeId=\"" << currentConsumerId
-                 << "\" ip=\"" << currentAddr.GetIpv4()
-                 << "\" cost=\"" << currentCost.totalCost
-                 << "\" processingCost=\"" << currentCost.processingCost
-                 << "\" queuePenalty=\"" << currentCost.queuePenalty
-                 << "\" waitTime=\"" << currentCost.waitingTime << "\"/>" << std::endl;
+                 << "\" ip=\"" << currentAddr.GetIpv4() << "\">" << std::endl;
 
+    // 主要成本项（高层级）
+    m_xmlLogFile << "      <Cost total=\"" << currentCost.totalCost << "\""
+                 << " processingCost=\"" << currentCost.processingCost << "\""
+                 << " congestionCost=\"" << currentCost.congestionCost << "\""
+                 << " producerMultiplier=\"" << currentCost.producerMultiplier << "\"/>" << std::endl;
+
+    // 中间计算参数（中层级）
+    m_xmlLogFile << "      <Intermediate timeDelay=\"" << currentCost.timeDelay << "\""
+                 << " baseCongestionCost=\"" << currentCost.baseCongestionCost << "\""
+                 << " TTTT=\"" << currentCost.TTTT << "\""
+                 << " taskStartTime=\"" << currentCost.taskStartTime << "\""
+                 << " priceAtStart=\"" << currentCost.priceAtStart << "\"/>" << std::endl;
+
+    // 底层参数（低层级）
+    m_xmlLogFile << "      <Parameters processingTime=\"" << currentCost.processingTime << "\""
+                 << " queueWaitTime=\"" << currentCost.queueWaitTime << "\""
+                 << " smoothedQueueLength=\"" << currentCost.smoothedQueueLength << "\""
+                 << " pendingTasks=\"" << currentCost.pendingTasks << "\"/>" << std::endl;
+
+    m_xmlLogFile << "    </CurrentTarget>" << std::endl;
+
+    // ========== SwitchTarget 详细信息 ==========
     m_xmlLogFile << "    <SwitchTarget nodeId=\"" << newConsumerId
-                 << "\" ip=\"" << newAddr.GetIpv4()
-                 << "\" cost=\"" << switchCost.totalCost
-                 << "\" processingCost=\"" << switchCost.processingCost
-                 << "\" queuePenalty=\"" << switchCost.queuePenalty
-                 << "\" waitTime=\"" << switchCost.waitingTime << "\"/>" << std::endl;
+                 << "\" ip=\"" << newAddr.GetIpv4() << "\">" << std::endl;
+
+    // 主要成本项（高层级）
+    m_xmlLogFile << "      <Cost total=\"" << switchCost.totalCost << "\""
+                 << " processingCost=\"" << switchCost.processingCost << "\""
+                 << " congestionCost=\"" << switchCost.congestionCost << "\""
+                 << " producerMultiplier=\"" << switchCost.producerMultiplier << "\"/>" << std::endl;
+
+    // 中间计算参数（中层级）
+    m_xmlLogFile << "      <Intermediate timeDelay=\"" << switchCost.timeDelay << "\""
+                 << " baseCongestionCost=\"" << switchCost.baseCongestionCost << "\""
+                 << " TTTT=\"" << switchCost.TTTT << "\""
+                 << " taskStartTime=\"" << switchCost.taskStartTime << "\""
+                 << " priceAtStart=\"" << switchCost.priceAtStart << "\"/>" << std::endl;
+
+    // 底层参数（低层级）
+    m_xmlLogFile << "      <Parameters processingTime=\"" << switchCost.processingTime << "\""
+                 << " queueWaitTime=\"" << switchCost.queueWaitTime << "\""
+                 << " smoothedQueueLength=\"" << switchCost.smoothedQueueLength << "\""
+                 << " pendingTasks=\"" << switchCost.pendingTasks << "\"/>" << std::endl;
+
+    m_xmlLogFile << "    </SwitchTarget>" << std::endl;
 
     m_xmlLogFile << "    <Threshold value=\"" << threshold << "\"/>" << std::endl;
     m_xmlLogFile << "  </Event>" << std::endl;

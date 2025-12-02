@@ -67,12 +67,27 @@ struct ConsumerState
  */
 struct CostMetrics
 {
+    // ==== 主要成本项（高层级） ====
     double totalCost = 0.0;        // 总成本
-    double processingCost = 0.0;   // 处理成本
-    double timeCost = 0.0;         // 时间成本（TTTT + 队列等待时间）
-    double queuePenalty = 0.0;     // 队列积压惩罚（向后兼容）
-    double waitingTime = 0.0;      // 预计等待时间 (秒)
-    double producerWeight = 1.0;   // 生产者压力权重
+    double processingCost = 0.0;   // 处理成本 = 电价 × 处理时间
+    double congestionCost = 0.0;   // 拥塞成本 = 基础拥塞成本 × 紧急度乘数
+    double producerMultiplier = 1.0; // 紧急度乘数 = 1.0 + (W_prod × tanh(PendingTasks / K_p))
+
+    // ==== 中间计算参数（中层级） ====
+    double baseCongestionCost = 0.0; // 基础拥塞成本 = W_base × tanh(T_delay / K_c)
+    double timeDelay = 0.0;         // T_delay = TTTT + waitTime
+    double processingTime = 0.0;    // 处理时间
+    double priceAtStart = 0.0;      // 任务开始时的电价
+    double taskStartTime = 0.0;     // 任务开始时间
+    double queueWaitTime = 0.0;     // 队列等待时间
+    double TTTT = 0.0;              // 预测的TTTT值
+
+    // ==== 底层参数（低层级） ====
+    double waitingTime = 0.0;       // 预计等待时间 (秒)
+    double queuePenalty = 0.0;      // 队列积压惩罚（向后兼容）
+    uint32_t pendingTasks = 0;      // 生产者待处理任务数
+    double smoothedQueueLength = 0.0; // 平滑队列长度
+    double producerWeight = 1.0;    // 生产者压力权重（已废弃，使用producerMultiplier）
 };
 
 struct NodeSpec

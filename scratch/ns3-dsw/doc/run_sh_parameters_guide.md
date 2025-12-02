@@ -155,29 +155,75 @@
 
 调度器总成本由三部分组成：
 
-```
+$$
 TotalCost = ProcessingCost + TimeCost
-```
+$$
 
 ### 1. 处理成本（ProcessingCost）
-```
-ProcessingCost = Price(T_start) × ProcessingTime
+$$
+ProcessingCost = Price(T_{start}) × ProcessingTime
+$$
+$$
 ProcessingTime = 1 / [tasksPerSecond × (1.0 - utilization × loadDecayFactor)]
-```
+$$
 
 ### 2. 时间成本（TimeCost）
-```
+$$
 TimeCost = 拥塞成本 × 紧急度乘数
-         = [W_base × tanh(T_delay / K_c)] × [1.0 + (W_prod × tanh(PendingTasks / K_p))]
+         = [W_base × tanh(T_{delay} / K_c)] × [1.0 + (W_{prod} × tanh(PendingTasks / K_p))]
+$$  
+  
 其中:
-T_delay = TTTT + (smoothedQueueLength × ProcessingTime)
-```
+$$
+T_{delay} = TTTT + (smoothedQueueLength × ProcessingTime) \\ = TTTT + waitTime
+$$
 
 ### 3. 完整公式
-```
-TotalCost = Price(T_start) × ProcessingTime
-          + [W_base × tanh((TTTT + smoothedQueueLength × ProcessingTime) / K_c)]
-            × [1.0 + (W_prod × tanh(PendingTasks / K_p))]
+
+$$
+TotalCost = Price(T_{start}) \times ProcessingTime
+          + \underbrace{[W_{base} \times \tanh(\frac{TTTT + waitTime}{K_c})]}_{\text{拥塞成本}}
+            \times \underbrace{[1.0 + (W_{prod} \times \tanh(\frac{PendingTasks}{K_p}))]}_{\text{紧急度乘数}}
+$$
+
+### 4. 公式参数详解
+
+| 符号 | run.sh 参数 | 含义 | 作用 |
+|------|-------------|------|------|
+| **loadDecayFactor** | `--loadDecayFactor` | 负载衰减因子 | 控制高负载时处理速度的衰减程度。值越大，高负载节点的惩罚越严重 |
+| **utilization** | (自动测量) | 节点当前利用率 | 反映节点负载状况，范围0-1 |
+| **tasksPerSecond** | (自动测量) | 节点理论处理速率 | 节点的理论最大处理能力 |
+| **TTTT** | (自动测量) | 传输时间(TTFB) | 首次字节到达时间，反映网络延迟 |
+| **smoothedQueueLength** | (自动测量) | 平滑队列长度 | 使用EWMA平滑的任务队列长度，避免短期波动 |
+| **W_base** | `--maxCongestionPenalty` | 拥塞惩罚基数 | 作为拥塞惩罚的软上限权重 |
+| **K_c** | `--congestionSensitivity` | 拥塞敏感度 | 控制tanh函数对延迟的敏感程度（单位：秒） |
+| **W_prod** | `--maxProducerPenalty` | 生产者惩罚权重 | 生产者紧急度乘数的最大值 |
+| **K_p** | `--producerSensitivity` | 生产者敏感度 | 控制多少待处理任务触发紧急调度（单位：个） |
+| **PendingTasks** | (自动测量) | 生产者待处理任务数 | 当前生产者队列中的任务总数 |
+
+**公式执行流程**：
+1. 计算有效处理速率：`tasksPerSecond × (1.0 - utilization × loadDecayFactor)`
+2. 计算处理时间：`1 / 有效处理速率`
+3. 计算总延迟：`TTTT + (smoothedQueueLength × ProcessingTime)`
+4. 计算拥塞成本：`W_base × tanh(总延迟 / K_c)`
+5. 计算紧急度乘数：`1.0 + (W_prod × tanh(PendingTasks / K_p))`
+6. 计算总成本：`Price(T_start) × ProcessingTime + 拥塞成本 × 紧急度乘数`
+
+### run.sh 控制的五个调度器参数速查
+
+在 `scratch/ns3-dsw/scripts/run.sh` 中可以调整的五个参数与公式变量的对应关系：
+
+| run.sh 参数 | 公式变量 | 默认值 | 参数说明 |
+|------------|---------|--------|----------|
+| `--loadDecayFactor` | `loadDecayFactor` | 0.5 | 负载衰减因子（见第2章详细说明） |
+| `--maxCongestionPenalty` | `W_base` | 0.5 | 拥塞惩罚基数（见第3章详细说明） |
+| `--congestionSensitivity` | `K_c` | 2.0 | 拥塞敏感度（见第3章详细说明） |
+| `--maxProducerPenalty` | `W_prod` | 3.0 | 生产者惩罚权重（见第4章详细说明） |
+| `--producerSensitivity` | `K_p` | 100.0 | 生产者敏感度（见第4章详细说明） |
+
+**使用方式**：
+```bash
+sh scratch/ns3-dsw/scripts/run.sh --loadDecayFactor=0.3 --maxCongestionPenalty=0.8 ...
 ```
 
 ---

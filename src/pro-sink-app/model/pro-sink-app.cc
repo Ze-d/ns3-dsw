@@ -807,7 +807,6 @@ MyProducer::StartApplication()
                << std::fixed << std::setprecision(3) << (m_switchThreshold * 100) << "%");
 
     // 创建UDP套接字用于RTT探测
-    std::cout << "打印消费者池子大小" << m_consumerAddresses.size();
     if (!m_consumerAddresses.empty())
     {
         TypeId udpTid = TypeId::LookupByName("ns3::UdpSocketFactory");
@@ -1077,19 +1076,19 @@ MyProducer::SendNextTask()
             NS_LOG_INFO("Pending Tasks: " << pendingTasks);
             NS_LOG_INFO("Current Target: Node " << currentNodeId
                        << " (" << currentAddr.GetIpv4() << ":8080)");
-            NS_LOG_INFO("  Cost_Stay: " << std::fixed << std::setprecision(4) << currentCost.totalCost
+            NS_LOG_INFO("  TotalCost: " << std::fixed << std::setprecision(4) << currentCost.totalCost
                        << " | Processing: " << currentCostDetailed.processingCost
-                       << " | TimeCost: " << currentCostDetailed.timeCost
-                       << " | ProducerWeight: " << currentCostDetailed.producerWeight
-                       << " | WaitTime: " << std::setprecision(3) << currentCostDetailed.waitingTime << "s");
+                       << " | Congestion: " << currentCostDetailed.congestionCost
+                       << " | ProducerMultiplier: " << currentCostDetailed.producerMultiplier
+                       << " | T_delay: " << std::setprecision(3) << currentCostDetailed.timeDelay << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Switch Target: Node " << switchNodeId
                        << " (" << switchAddr.GetIpv4() << ":8080)");
-            NS_LOG_INFO("  Cost_Switch: " << switchCost.totalCost
+            NS_LOG_INFO("  TotalCost: " << switchCost.totalCost
                        << " | Processing: " << switchCost.processingCost
-                       << " | TimeCost: " << switchCost.timeCost
-                       << " | ProducerWeight: " << switchCost.producerWeight
-                       << " | WaitTime: " << switchCost.waitingTime << "s");
+                       << " | Congestion: " << switchCost.congestionCost
+                       << " | ProducerMultiplier: " << switchCost.producerMultiplier
+                       << " | T_delay: " << switchCost.timeDelay << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Threshold (" << std::setprecision(1) << (m_switchThreshold * 100) << "% lower): " << thresholdValue);
             NS_LOG_INFO("Decision: " << (switchCost.totalCost < thresholdValue ? "SWITCH" : "STAY"));
