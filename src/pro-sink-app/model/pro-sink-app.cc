@@ -32,28 +32,42 @@ TypeId ProbeHeader::GetInstanceTypeId(void) const
 
 uint32_t ProbeHeader::GetSerializedSize(void) const
 {
-    // 存储Time需要8字节（double）
-    return sizeof(double);
+    // Time内部是一个int64，序列化为8字节
+    // NodeId 是uint32，序列化为4字节
+    return 8 + 4;
 }
 
 void ProbeHeader::Serialize(Buffer::Iterator start) const
 {
-    start.WriteHtonU64(m_timestamp.GetDouble());
+    // 【修正】不要用 GetDouble()。
+    // 使用 GetTimeStep() 获取 Time 对象内部原始的 int64 计数值。
+    // 这保留了纳秒/皮秒级的完整精度。
+    start.WriteHtonU64(m_timestamp.GetTimeStep());
+    
+    start.WriteHtonU32(m_nodeId);
 }
 
 uint32_t ProbeHeader::Deserialize(Buffer::Iterator start)
 {
-    m_timestamp = Time::FromDouble(start.ReadNtohU64(), Time::S);
+    // 【修正】对应 Serialize，读取原始的 int64 计数值
+    uint64_t timeStep = start.ReadNtohU64();
+    
+    // 使用 Time 的构造函数直接从 TimeStep 恢复
+    m_timestamp = Time(timeStep);
+    
+    m_nodeId = start.ReadNtohU32();
     return GetSerializedSize();
 }
 
 void ProbeHeader::Print(std::ostream &os) const
 {
-    os << "Timestamp=" << m_timestamp.GetSeconds() << "s";
+    // 打印 TimeStep 以便调试底层数值
+    os << "Timestamp=" << m_timestamp.GetSeconds() << "s (" 
+       << m_timestamp.GetTimeStep() << " ticks) NodeId=" << m_nodeId;
 }
 
 ProbeHeader::ProbeHeader()
-    : m_timestamp(Time(0))
+    : m_timestamp(Time(0)), m_nodeId(0)
 {
 }
 
@@ -69,6 +83,16 @@ void ProbeHeader::SetTimestamp(Time timestamp)
 Time ProbeHeader::GetTimestamp() const
 {
     return m_timestamp;
+}
+
+void ProbeHeader::SetNodeId(uint32_t nodeId)
+{
+    m_nodeId = nodeId;
+}
+
+uint32_t ProbeHeader::GetNodeId() const
+{
+    return m_nodeId;
 } 
 
 // --- 0. TaskHeader 实现 ---
@@ -353,13 +377,13 @@ MySink::StopApplication()
         m_listenSocket->Close();
     }
 
-    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
                   << "]: 停止处理新任务。总共处理任务数: " << m_tasksCompleted
                   << ". 队列中剩余任务数: " << m_taskQueue.size());
 
     if (m_powerCouplingEnabled)
     {
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
+        NS_LOG_DEBUG(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
                       << "]: 累积总成本: $" << std::fixed << std::setprecision(2) << m_totalAccumulatedCost);
 
         if (m_powerCostXmlFile.is_open())
@@ -474,7 +498,7 @@ MySink::ProcessSocketBuffer(Ptr<Socket> socket)
         if (m_currentRxBytesPerTask[taskKey] >= m_taskSize)
         {
             m_taskQueue.push(taskKey);
-            NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 任务 "
+            NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 任务 "
                           << taskKey.first << "-" << taskKey.second << " 完整接收并入列，队列共有"
                           << m_taskQueue.size() << "个任务等待处理。");
 
@@ -517,7 +541,7 @@ MySink::ProcessTasks()
         m_tasksCompleted++;
         m_processingCredit -= 1.0;
 
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 任务 "
+        NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 任务 "
                       << taskKey.first << "-" << taskKey.second << " 处理完成，队列共有"
                       << m_taskQueue.size() << "个任务等待处理。消费者 "
                       << m_nodeId << " 处理总数 " << m_tasksCompleted << ".");
@@ -619,7 +643,7 @@ MySink::ReportUtilization()
         m_totalAccumulatedCost += intervalCost;
 
         // 5. 打印控制台日志 (扩展)
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
+        NS_LOG_DEBUG(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId
                       << "]: Util: " << std::fixed << std::setprecision(2) << utilization * 100.0 << "%"
                       << " | AvgPower: " << std::setprecision(3) << avgPower_MW << " MW"
                       << " | Price: $" << std::setprecision(2) << currentPrice_per_MWh << "/MWh"
@@ -640,7 +664,7 @@ MySink::ReportUtilization()
     }
     else
     {
-        NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 算力利用率 (过去 "
+        NS_LOG_DEBUG(Simulator::Now().GetSeconds() << "s: [消费者 " << m_nodeId << "]: 算力利用率 (过去 "
                       << m_updateInterval.GetSeconds() << "s): " << std::fixed << std::setprecision(2) << utilization * 100.0 << "%");
     }
 
@@ -798,8 +822,8 @@ MyProducer::StartApplication()
 
         NS_LOG_INFO("RTT probe UDP socket created for producer on node " << GetNode()->GetId());
 
-        // 启动RTT探测（每10秒）
-        Simulator::Schedule(Seconds(10.0), &MyProducer::SendRTTProbe, this);
+        // 启动RTT探测（每0.25秒）
+        Simulator::Schedule(Seconds(0.25), &MyProducer::SendRTTProbe, this);
     }
 
     // 使用 TcpSocketFactory
@@ -824,13 +848,13 @@ MyProducer::StopApplication()
 {
     m_running = false; // 1. 信号：停止生成新任务和接受新任务
 
-    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 停止生产新任务, 总共发送任务数: " << m_totalTasksSent 
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 停止生产新任务, 总共发送任务数: " << m_totalTasksSent 
                   << ". 队列中剩余任务数: " << m_taskQueue.size());
     // 2. 检查是否可以立即停止
     if (!m_isSending)
     {
         // 当前没有任务在发送，可以安全关闭
-        //NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 立即停止 (未在发送)。");
+        //NS_LOG_INFO("生产者 " << GetNode()->GetId() << ": 立即停止 (未在发送)。");
         if (m_socket != nullptr && m_connected) // 检查 m_connected 避免在未连接时关闭
         {
             m_socket->Close();
@@ -1052,19 +1076,19 @@ MyProducer::SendNextTask()
             NS_LOG_INFO("Pending Tasks: " << pendingTasks);
             NS_LOG_INFO("Current Target: Node " << currentNodeId
                        << " (" << currentAddr.GetIpv4() << ":8080)");
-            NS_LOG_INFO("  Cost_Stay: " << std::fixed << std::setprecision(4) << currentCost.totalCost
+            NS_LOG_INFO("  TotalCost: " << std::fixed << std::setprecision(4) << currentCost.totalCost
                        << " | Processing: " << currentCostDetailed.processingCost
-                       << " | TimeCost: " << currentCostDetailed.timeCost
-                       << " | ProducerWeight: " << currentCostDetailed.producerWeight
-                       << " | WaitTime: " << std::setprecision(3) << currentCostDetailed.waitingTime << "s");
+                       << " | Congestion: " << currentCostDetailed.congestionCost
+                       << " | ProducerMultiplier: " << currentCostDetailed.producerMultiplier
+                       << " | T_delay: " << std::setprecision(3) << currentCostDetailed.timeDelay << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Switch Target: Node " << switchNodeId
                        << " (" << switchAddr.GetIpv4() << ":8080)");
-            NS_LOG_INFO("  Cost_Switch: " << switchCost.totalCost
+            NS_LOG_INFO("  TotalCost: " << switchCost.totalCost
                        << " | Processing: " << switchCost.processingCost
-                       << " | TimeCost: " << switchCost.timeCost
-                       << " | ProducerWeight: " << switchCost.producerWeight
-                       << " | WaitTime: " << switchCost.waitingTime << "s");
+                       << " | Congestion: " << switchCost.congestionCost
+                       << " | ProducerMultiplier: " << switchCost.producerMultiplier
+                       << " | T_delay: " << switchCost.timeDelay << "s");
             NS_LOG_INFO("");
             NS_LOG_INFO("Threshold (" << std::setprecision(1) << (m_switchThreshold * 100) << "% lower): " << thresholdValue);
             NS_LOG_INFO("Decision: " << (switchCost.totalCost < thresholdValue ? "SWITCH" : "STAY"));
@@ -1156,7 +1180,7 @@ MyProducer::SendNextTask()
     // 记录任务开始时间（用于TTTT测量）
     m_taskStartTime = Simulator::Now();
 
-    NS_LOG_UNCOND(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 开始发送任务 "
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 开始发送任务 "
                   << m_currentSendingProducerId << "-" << m_currentSendingTaskId
                   << " 到 " << InetSocketAddress::ConvertFrom(m_peerAddress).GetIpv4());
 
@@ -1221,7 +1245,7 @@ MyProducer::SendPacket()
         // 软停止：任务已发送完毕，并且 StopApplication 已被调用。
         // 现在可以安全关闭套接字。
         /*
-                NS_LOG_UNCOND("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 "
+                NS_LOG_INFO("生产者 " << GetNode()->GetId() << ": 软停止 - 已发完最后一个任务 "
                       << m_currentSendingProducerId << "-" << m_currentSendingTaskId
                       << "，现在关闭套接字。");
         */
@@ -1286,7 +1310,7 @@ MyProducer::SendRTTProbe()
     }
 
     // 调度下一次探测
-    Simulator::Schedule(Seconds(10.0), &MyProducer::SendRTTProbe, this);
+    Simulator::Schedule(Seconds(0.25), &MyProducer::SendRTTProbe, this);
 }
 
 void
@@ -1295,8 +1319,8 @@ MyProducer::HandleRTTProbeReceive(Ptr<Socket> socket)
     Address from;
     Ptr<Packet> packet = socket->RecvFrom(from);
 
-    // 期待接收8字节回复包
-    if (packet->GetSize() < 8)
+    // 期待接收12字节回复包（8字节时间戳 + 4字节NodeId）
+    if (packet->GetSize() < 12)
     {
         return;
     }
@@ -1305,17 +1329,16 @@ MyProducer::HandleRTTProbeReceive(Ptr<Socket> socket)
     packet->RemoveHeader(header);
 
     Time sendTime = header.GetTimestamp();
+    uint32_t consumerNodeId = header.GetNodeId();
     Time rtt = Simulator::Now() - sendTime;
 
-    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: RTT measured: " << rtt.GetSeconds() << "s");
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: RTT measured: " << rtt.GetSeconds() << "s from Node " << consumerNodeId);
 
     // 报告RTT测量结果
     if (m_scheduler)
     {
-        InetSocketAddress inetFrom = InetSocketAddress::ConvertFrom(from);
-        // 构造TCP端口地址（从UDP地址转换）
-        Address consumerAddr = InetSocketAddress(inetFrom.GetIpv4(), 8080);
-        m_scheduler->ReportRTTMeasured(consumerAddr, rtt);
+        // 直接使用 Node ID 报告，不再需要地址转换的杂耍了
+        m_scheduler->ReportRTTMeasured(consumerNodeId, rtt);
     }
 }
 
@@ -1341,9 +1364,10 @@ MySink::HandleProbeReceive(Ptr<Socket> socket)
                 << ") received probe from " << InetSocketAddress::ConvertFrom(from).GetIpv4()
                 << ", timestamp: " << timestamp.GetSeconds() << "s");
 
-    // 创建8字节回复包（只包含时间戳）
+    // 创建12字节回复包（时间戳 + NodeId）
     ProbeHeader replyHeader;
     replyHeader.SetTimestamp(timestamp);
+    replyHeader.SetNodeId(m_nodeId);  // 填入自己的 Node ID
 
     Ptr<Packet> replyPacket = Create<Packet>(0); // 0字节 payload
     replyPacket->AddHeader(replyHeader);

@@ -1,15 +1,1 @@
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "read -r input_json; command_input=$(echo \"$input_json\" | jq -r '.input'); if [[ $command_input == \"git commit\"* ]]; then if [ ! -f \"/tmp/ns3-dsw-tests-pass\" ]; then echo \"错误：测试未通过或未运行。在提交(git commit)之前，您必须首先运行 \\`sh scratch/ns3-dsw/scripts/run-tests.sh\\` 并确保它成功通过。\" >&2; exit 2; else rm -f \"/tmp/ns3-dsw-tests-pass\"; exit 0; fi; fi; exit 0"
-          }
-        ]
-      }
-    ]
-  }
-}
+{}

@@ -59,3 +59,6 @@ WORK.md
 
 # Simulation output files
 scratch/ns3-dsw/out/
+
+*tmp/
+*out/

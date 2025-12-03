@@ -36,15 +36,20 @@ public:
      * @brief 初始化调度器
      * @param consumers 消费者状态列表
      * @param priceProfile 电价曲线 (288个点，5分钟间隔)
-     * @param queuePenaltyFactor 队列积压惩罚系数
      * @param loadDecayFactor 负载衰减因子 (0.0-1.0，影响高负载下的处理速度)
-     * @param producerWeightFactor 生产者压力权重因子 (默认0.15)
+     * @param maxCongestionPenalty 最大拥塞惩罚 (W_base，默认0.5)
+     * @param congestionSensitivity 拥塞敏感度 (K_c，秒为单位，默认2.0)
+     * @param maxProducerPenalty 最大生产者紧急度乘数 (W_prod，默认3.0)
+     * @param producerSensitivity 生产者敏感度 (K_p，任务数为单位，默认100.0)
      */
     void Initialize(const std::vector<ConsumerState>& consumers,
                     const std::vector<double>& priceProfile,
-                    double queuePenaltyFactor = 0.1,
                     double loadDecayFactor = 0.5,
-                    double producerWeightFactor = 0.15);
+                    double maxCongestionPenalty = 0.5,
+                    double congestionSensitivity = 2.0,
+                    double maxProducerPenalty = 3.0,
+                    double producerSensitivity = 100.0,
+                    std::string logFilePath = "scratch/ns3-dsw/out/scheduler_events.xml");
 
     /**
      * @brief 调度下一个任务到最优消费者
@@ -98,12 +103,6 @@ public:
     double GetPriceAtTime(double timeHours, double phaseOffsetHours) const;
 
     /**
-     * @brief 设置队列惩罚系数
-     * @param factor 惩罚系数 (默认0.1)
-     */
-    void SetQueuePenaltyFactor(double factor);
-
-    /**
      * @brief 获取消费者列表
      * @return 消费者状态列表的常量引用
      */
@@ -120,16 +119,6 @@ public:
     void SetLoadDecayFactor(double factor);
 
     /**
-     * @brief 设置生产者压力权重因子
-     * @param factor 压力权重因子 (默认0.15)
-     * @details
-     * 控制生产者任务积压对调度决策的影响程度。
-     * 值越大，生产者积压时对时间成本的惩罚越严重，
-     * 调度器越倾向于选择处理速度快的节点而非电价低的节点。
-     */
-    void SetProducerWeightFactor(double factor);
-
-    /**
      * @brief 报告TTTT测量结果
      * @param consumerAddress 消费者地址
      * @param tttt TTTT测量值
@@ -142,6 +131,13 @@ public:
      * @param rtt RTT测量值
      */
     void ReportRTTMeasured(Address consumerAddress, Time rtt);
+
+    /**
+     * @brief 报告RTT测量结果（使用NodeId）
+     * @param nodeId 消费者节点ID
+     * @param rtt RTT测量值
+     */
+    void ReportRTTMeasured(uint32_t nodeId, Time rtt);
 
     /**
      * @brief 记录调度事件到XML文件
@@ -219,9 +215,11 @@ private:
 
     std::vector<ConsumerState> m_consumers;  // 消费者状态列表
     std::vector<double> m_priceProfile;      // 电价曲线
-    double m_queuePenaltyFactor;             // 队列积压惩罚系数
     double m_loadDecayFactor;                // 负载衰减因子
-    double m_producerWeightFactor;           // 生产者压力权重因子
+    double m_maxCongestionPenalty;           // W_base: 最大拥塞惩罚 (Soft Cap)
+    double m_congestionSensitivity;          // K_c: 拥塞敏感度 (秒)
+    double m_maxProducerPenalty;             // W_prod: 最大生产者紧急度乘数
+    double m_producerSensitivity;            // K_p: 生产者敏感度 (任务数)
     bool m_initialized;                      // 初始化标志
 
     // XML记录相关

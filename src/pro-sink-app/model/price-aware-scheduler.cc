@@ -18,9 +18,11 @@ TypeId PriceAwareScheduler::GetTypeId(void)
 }
 
 PriceAwareScheduler::PriceAwareScheduler()
-    : m_queuePenaltyFactor(0.1),
-      m_loadDecayFactor(0.5),
-      m_producerWeightFactor(0.15),
+    : m_loadDecayFactor(0.5),
+      m_maxCongestionPenalty(0.5),
+      m_congestionSensitivity(2.0),
+      m_maxProducerPenalty(3.0),
+      m_producerSensitivity(100.0),
       m_initialized(false),
       m_xmlLogFile()
 {
@@ -41,36 +43,45 @@ PriceAwareScheduler::~PriceAwareScheduler()
 
 void PriceAwareScheduler::Initialize(const std::vector<ConsumerState>& consumers,
                                      const std::vector<double>& priceProfile,
-                                     double queuePenaltyFactor,
                                      double loadDecayFactor,
-                                     double producerWeightFactor)
+                                     double maxCongestionPenalty,
+                                     double congestionSensitivity,
+                                     double maxProducerPenalty,
+                                     double producerSensitivity,
+                                     std::string logFilePath)
 {
-    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << queuePenaltyFactor << loadDecayFactor << producerWeightFactor);
+    NS_LOG_FUNCTION(this << consumers.size() << priceProfile.size() << loadDecayFactor);
 
     m_consumers = consumers;
     m_priceProfile = priceProfile;
-    m_queuePenaltyFactor = queuePenaltyFactor;
     m_loadDecayFactor = loadDecayFactor;
-    m_producerWeightFactor = producerWeightFactor;
+    m_maxCongestionPenalty = maxCongestionPenalty;
+    m_congestionSensitivity = congestionSensitivity;
+    m_maxProducerPenalty = maxProducerPenalty;
+    m_producerSensitivity = producerSensitivity;
     m_initialized = true;
 
     // 打开XML日志文件
-    m_xmlLogFile.open("scratch/ns3-dsw/out/scheduler_events.xml", std::ios::out | std::ios::trunc);
+    m_xmlLogFile.open(logFilePath, std::ios::out | std::ios::trunc);
     if (m_xmlLogFile.is_open())
     {
         m_xmlLogFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
         m_xmlLogFile << "<SchedulerEvents>" << std::endl;
         m_xmlLogFile << std::fixed << std::setprecision(6);
-        NS_LOG_INFO("Scheduler XML log opened: scratch/ns3-dsw/out/scheduler_events.xml");
+        NS_LOG_INFO("Scheduler XML log opened: " << logFilePath);
     }
     else
     {
-        NS_LOG_WARN("Failed to open scheduler XML log file");
+        NS_LOG_WARN("Failed to open scheduler XML log file at: " << logFilePath);
     }
 
     NS_LOG_INFO("PriceAwareScheduler initialized with " << m_consumers.size()
               << " consumers, " << m_priceProfile.size() << " price points, "
-              << "load decay factor " << loadDecayFactor << ".");
+              << "load decay factor " << loadDecayFactor
+              << ", max congestion penalty " << maxCongestionPenalty
+              << ", congestion sensitivity " << congestionSensitivity << "s"
+              << ", max producer penalty " << maxProducerPenalty
+              << ", producer sensitivity " << producerSensitivity << " tasks.");
 }
 
 Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t producerPendingTasks)
@@ -95,7 +106,6 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t p
 
     NS_LOG_INFO("========== Scheduling Decision at T=" << taskArrivalTime << "s ==========");
     NS_LOG_INFO("Producer Pending Tasks: " << producerPendingTasks);
-    NS_LOG_INFO("Producer Weight Factor: " << m_producerWeightFactor);
     NS_LOG_INFO("Evaluating " << m_consumers.size() << " consumers:");
 
     for (auto& consumer : m_consumers)
@@ -107,14 +117,15 @@ Address PriceAwareScheduler::ScheduleNextTask(double taskArrivalTime, uint32_t p
         CostMetrics metrics = CalculateCost(consumer, taskArrivalTime, smoothedQueueLength, producerPendingTasks);
 
         InetSocketAddress consumerAddr = InetSocketAddress::ConvertFrom(consumer.sinkAddress);
+        Time predictedTttt = PredictTTTT(consumer);
         NS_LOG_INFO("  Consumer " << consumer.nodeId
                     << " (" << consumerAddr.GetIpv4() << ":8080)"
                     << " - TotalCost: " << std::fixed << std::setprecision(4) << metrics.totalCost
                     << " | ProcessingCost: " << metrics.processingCost
-                    << " | TimeCost: " << metrics.timeCost
-                    << " | ProducerWeight: " << metrics.producerWeight
-                    << " | WaitTime: " << std::setprecision(3) << metrics.waitingTime << "s"
-                    << " | TTTT: " << PredictTTTT(consumer).GetSeconds() << "s"
+                    << " | CongestionCost: " << metrics.congestionCost
+                    << " | ProducerMultiplier: " << metrics.producerMultiplier
+                    << " | T_delay: " << std::setprecision(3) << metrics.timeDelay << "s"
+                    << " | TTTT: " << predictedTttt.GetSeconds() << "s"
                     << " | SmoothedQueue: " << smoothedQueueLength);
 
         if (metrics.totalCost < bestCost)
@@ -144,19 +155,51 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     double processingTime = CalculateProcessingTime(consumer);
 
     // 3. 计算等待时间
-    metrics.waitingTime = startTime - taskArrivalTime;
+    double waitingTime = startTime - taskArrivalTime;
 
     // 4. 获取该时间点的电价
     double price = GetPriceAtTime(startTime, consumer.phaseOffsetHours);
 
-    // 5. 计算处理成本
+    // 5. 使用简化的时间成本计算（不考虑生产者压力）
+    // 这个方法主要用于向后兼容，实际调度使用带smoothedQueueLength的版本
+    Time predictedTTTT = PredictTTTT(consumer);
+    double queueWaitTime = consumer.currentQueueLength * processingTime;
+    double T_delay = predictedTTTT.GetSeconds() + queueWaitTime;
+
+    // 基础拥塞成本（归一化）
+    double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
+
+    // ===== 保存中间计算值到metrics结构体 =====
+
+    // 底层参数
+    metrics.TTTT = predictedTTTT.GetSeconds();
+    metrics.processingTime = processingTime;
+    metrics.smoothedQueueLength = consumer.currentQueueLength;
+    metrics.pendingTasks = 0; // 简化版本不考虑生产者压力
+    metrics.queueWaitTime = queueWaitTime;
+    metrics.waitingTime = waitingTime;
+
+    // 中间计算参数
+    metrics.taskStartTime = startTime;
+    metrics.priceAtStart = price;
+    metrics.timeDelay = T_delay;
+    metrics.baseCongestionCost = Cost_cong;
+
+    // 生产者紧急度乘数（简化版本为1.0）
+    metrics.producerMultiplier = 1.0;
+    metrics.producerWeight = 1.0;
+
+    // 6. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // 6. 计算队列积压惩罚 - 使用瞬时值（向后兼容）
-    metrics.queuePenalty = consumer.currentQueueLength * m_queuePenaltyFactor;
+    // 计算最终拥塞成本 = 基础拥塞成本 × 紧急度乘数（简化版本中乘数为1.0）
+    metrics.congestionCost = Cost_cong;
 
-    // 7. 总成本
-    metrics.totalCost = metrics.processingCost + metrics.queuePenalty;
+    // 计算总成本 = 处理成本 + 拥塞成本
+    metrics.totalCost = metrics.processingCost + metrics.congestionCost;
+
+    // 保留queuePenalty以向后兼容
+    metrics.queuePenalty = metrics.congestionCost;
 
     return metrics;
 }
@@ -179,7 +222,6 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
 
     // 3. 计算队列等待时间 - 使用平滑队列长度
     double queueWaitTime = smoothedQueueLength * processingTime;
-    metrics.waitingTime = queueWaitTime;
 
     // 4. 计算任务开始时间
     double startTime = arrivalTimeAtConsumer + queueWaitTime;
@@ -187,21 +229,46 @@ CostMetrics PriceAwareScheduler::CalculateCost(const ConsumerState& consumer,
     // 5. 获取该时间点的电价
     double price = GetPriceAtTime(startTime, consumer.phaseOffsetHours);
 
+    // ===== 保存中间计算值到metrics结构体 =====
+
+    // 底层参数
+    metrics.TTTT = predictedTTTT.GetSeconds();
+    metrics.processingTime = processingTime;
+    metrics.smoothedQueueLength = smoothedQueueLength;
+    metrics.pendingTasks = producerPendingTasks;
+    metrics.queueWaitTime = queueWaitTime;
+    metrics.waitingTime = queueWaitTime;
+
+    // 中间计算参数
+    metrics.taskStartTime = startTime;
+    metrics.priceAtStart = price;
+
+    // 计算总延迟 T_delay = TTTT + queueWaitTime
+    double T_delay = predictedTTTT.GetSeconds() + queueWaitTime;
+    metrics.timeDelay = T_delay;
+
+    // 计算基础拥塞成本（归一化）
+    // Cost_cong = m_maxCongestionPenalty * tanh(T_delay / m_congestionSensitivity)
+    double Cost_cong = m_maxCongestionPenalty * std::tanh(T_delay / m_congestionSensitivity);
+    metrics.baseCongestionCost = Cost_cong;
+
+    // 计算生产者紧急度乘数（归一化）
+    // Multiplier = 1.0 + (m_maxProducerPenalty * tanh(ProducerPending / m_producerSensitivity))
+    double Multiplier = 1.0 + (m_maxProducerPenalty * std::tanh(static_cast<double>(producerPendingTasks) / m_producerSensitivity));
+    metrics.producerMultiplier = Multiplier;
+    metrics.producerWeight = Multiplier; // 向后兼容
+
     // 6. 计算处理成本
     metrics.processingCost = price * processingTime;
 
-    // 7. 计算时间成本 = (TTTT + 队列等待时间) * 惩罚系数
-    double totalWaitTime = predictedTTTT.GetSeconds() + queueWaitTime;
-    metrics.timeCost = totalWaitTime * m_queuePenaltyFactor;
+    // 计算最终拥塞成本 = 基础拥塞成本 × 紧急度乘数
+    metrics.congestionCost = Cost_cong * Multiplier;
 
-    // 8. 计算生产者压力权重
-    metrics.producerWeight = 1.0 + (static_cast<double>(producerPendingTasks) * m_producerWeightFactor);
+    // 计算总成本 = 处理成本 + 拥塞成本
+    metrics.totalCost = metrics.processingCost + metrics.congestionCost;
 
-    // 9. 总成本 = 处理成本 + (时间成本 * 生产者压力权重)
-    metrics.totalCost = metrics.processingCost + (metrics.timeCost * metrics.producerWeight);
-
-    // 10. 保留queuePenalty以向后兼容（实际上已整合到timeCost中）
-    metrics.queuePenalty = metrics.timeCost * metrics.producerWeight;
+    // 保留queuePenalty以向后兼容（设置为拥塞成本）
+    metrics.queuePenalty = metrics.congestionCost;
 
     return metrics;
 }
@@ -316,19 +383,15 @@ void PriceAwareScheduler::UpdateConsumerState(uint32_t nodeId,
             }
 
             NS_LOG_DEBUG("Updated Consumer " << nodeId
-                        << ": Util=" << (utilization ? *utilization : -1.0)
-                        << ", Queue=" << (queueLength ? *queueLength : static_cast<uint32_t>(-1)));
+                        << " State: Util=" << consumer.currentUtilization  
+                        << ", Queue=" << consumer.currentQueueLength       
+                        << " (Input: Util=" << (utilization ? "Set" : "Skip") 
+                        << ", Queue=" << (queueLength ? "Set" : "Skip") << ")");
             return;
         }
     }
 
     NS_LOG_WARN("Consumer with nodeId " << nodeId << " not found!");
-}
-
-void PriceAwareScheduler::SetQueuePenaltyFactor(double factor)
-{
-    NS_LOG_FUNCTION(this << factor);
-    m_queuePenaltyFactor = factor;
 }
 
 void PriceAwareScheduler::SetLoadDecayFactor(double factor)
@@ -338,13 +401,6 @@ void PriceAwareScheduler::SetLoadDecayFactor(double factor)
     NS_LOG_INFO("Load decay factor set to " << m_loadDecayFactor);
 }
 
-void PriceAwareScheduler::SetProducerWeightFactor(double factor)
-{
-    NS_LOG_FUNCTION(this << factor);
-    m_producerWeightFactor = factor;
-    NS_LOG_INFO("Producer weight factor set to " << m_producerWeightFactor);
-}
-
 const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const
 {
     return m_consumers;
@@ -352,8 +408,6 @@ const std::vector<ConsumerState>& PriceAwareScheduler::GetConsumers() const
 
 void PriceAwareScheduler::ReportTTTTMeasured(Address consumerAddress, Time tttt)
 {
-    NS_LOG_FUNCTION(this << consumerAddress << tttt.GetSeconds());
-
     for (auto& consumer : m_consumers)
     {
         if (consumer.sinkAddress == consumerAddress)
@@ -361,14 +415,37 @@ void PriceAwareScheduler::ReportTTTTMeasured(Address consumerAddress, Time tttt)
             consumer.m_lastMeasuredTTTT = tttt;
             consumer.m_lastTTTTTimestamp = Simulator::Now();
 
-            NS_LOG_INFO("TTTT measured for consumer " << consumer.nodeId
-                      << ": " << tttt.GetSeconds() << "s");
+            // 1. 安全检查：防止除以零
+            if (consumer.m_lastMeasuredRTT.IsZero()) {
+                 NS_LOG_WARN("RTT is zero, cannot update K-factor for node " << consumer.nodeId);
+                 return; 
+            }
+
+            // 2. 计算瞬时 K 值
+            double currentK = tttt.GetSeconds() / consumer.m_lastMeasuredRTT.GetSeconds();
+
+            // 3. 异常值过滤 (Sanity Check)
+            // K因子理论上不应小于1（任务时间不可能短于RTT），也不应过大（除非断网）
+            // 这里设置一个宽松的范围，比如 [1.0, 1000.0]
+            if (currentK < 1.0) currentK = 1.0; 
+            
+            // 4. EWMA 平滑更新 (Alpha 通常取 0.125 或 0.25)
+            // 新值占 0.25，历史值占 0.75，防止 K 值剧烈抖动
+            double alpha = 0.25;
+            if (consumer.m_K_factor == 1.0) { 
+                // 如果是第一次（假设初值为1.0），直接赋值，不要平滑
+                consumer.m_K_factor = currentK;
+            } else {
+                consumer.m_K_factor = (1.0 - alpha) * consumer.m_K_factor + alpha * currentK;
+            }
+
+            NS_LOG_INFO("Updated K-Factor for consumer " << consumer.nodeId
+                      << ": Raw=" << currentK 
+                      << ", Smoothed=" << consumer.m_K_factor);
 
             return;
         }
     }
-
-    NS_LOG_WARN("Consumer with address " << consumerAddress << " not found!");
 }
 
 void PriceAwareScheduler::ReportRTTMeasured(Address consumerAddress, Time rtt)
@@ -381,7 +458,7 @@ void PriceAwareScheduler::ReportRTTMeasured(Address consumerAddress, Time rtt)
         {
             consumer.m_lastMeasuredRTT = rtt;
 
-            NS_LOG_INFO("RTT measured for consumer " << consumer.nodeId
+            NS_LOG_DEBUG("RTT measured for consumer " << consumer.nodeId
                       << ": " << rtt.GetSeconds() << "s");
 
             return;
@@ -389,6 +466,26 @@ void PriceAwareScheduler::ReportRTTMeasured(Address consumerAddress, Time rtt)
     }
 
     NS_LOG_WARN("Consumer with address " << consumerAddress << " not found!");
+}
+
+void PriceAwareScheduler::ReportRTTMeasured(uint32_t nodeId, Time rtt)
+{
+    NS_LOG_FUNCTION(this << nodeId << rtt.GetSeconds());
+
+    for (auto& consumer : m_consumers)
+    {
+        if (consumer.nodeId == nodeId)
+        {
+            consumer.m_lastMeasuredRTT = rtt;
+
+            NS_LOG_DEBUG("RTT measured for consumer " << consumer.nodeId
+                      << ": " << rtt.GetSeconds() << "s");
+
+            return;
+        }
+    }
+
+    NS_LOG_WARN("Consumer with Node ID " << nodeId << " not found!");
 }
 
 Time PriceAwareScheduler::PredictTTTT(const ConsumerState& consumer) const
@@ -456,19 +553,55 @@ void PriceAwareScheduler::LogSchedulingEvent(uint32_t producerNodeId,
                  << " producerNode=\"" << producerNodeId << "\""
                  << " decision=\"" << decision << "\">" << std::endl;
 
+    // ========== CurrentTarget 详细信息 ==========
     m_xmlLogFile << "    <CurrentTarget nodeId=\"" << currentConsumerId
-                 << "\" ip=\"" << currentAddr.GetIpv4()
-                 << "\" cost=\"" << currentCost.totalCost
-                 << "\" processingCost=\"" << currentCost.processingCost
-                 << "\" queuePenalty=\"" << currentCost.queuePenalty
-                 << "\" waitTime=\"" << currentCost.waitingTime << "\"/>" << std::endl;
+                 << "\" ip=\"" << currentAddr.GetIpv4() << "\">" << std::endl;
 
+    // 主要成本项（高层级）
+    m_xmlLogFile << "      <Cost total=\"" << currentCost.totalCost << "\""
+                 << " processingCost=\"" << currentCost.processingCost << "\""
+                 << " congestionCost=\"" << currentCost.congestionCost << "\""
+                 << " producerMultiplier=\"" << currentCost.producerMultiplier << "\"/>" << std::endl;
+
+    // 中间计算参数（中层级）
+    m_xmlLogFile << "      <Intermediate timeDelay=\"" << currentCost.timeDelay << "\""
+                 << " baseCongestionCost=\"" << currentCost.baseCongestionCost << "\""
+                 << " TTTT=\"" << currentCost.TTTT << "\""
+                 << " taskStartTime=\"" << currentCost.taskStartTime << "\""
+                 << " priceAtStart=\"" << currentCost.priceAtStart << "\"/>" << std::endl;
+
+    // 底层参数（低层级）
+    m_xmlLogFile << "      <Parameters processingTime=\"" << currentCost.processingTime << "\""
+                 << " queueWaitTime=\"" << currentCost.queueWaitTime << "\""
+                 << " smoothedQueueLength=\"" << currentCost.smoothedQueueLength << "\""
+                 << " pendingTasks=\"" << currentCost.pendingTasks << "\"/>" << std::endl;
+
+    m_xmlLogFile << "    </CurrentTarget>" << std::endl;
+
+    // ========== SwitchTarget 详细信息 ==========
     m_xmlLogFile << "    <SwitchTarget nodeId=\"" << newConsumerId
-                 << "\" ip=\"" << newAddr.GetIpv4()
-                 << "\" cost=\"" << switchCost.totalCost
-                 << "\" processingCost=\"" << switchCost.processingCost
-                 << "\" queuePenalty=\"" << switchCost.queuePenalty
-                 << "\" waitTime=\"" << switchCost.waitingTime << "\"/>" << std::endl;
+                 << "\" ip=\"" << newAddr.GetIpv4() << "\">" << std::endl;
+
+    // 主要成本项（高层级）
+    m_xmlLogFile << "      <Cost total=\"" << switchCost.totalCost << "\""
+                 << " processingCost=\"" << switchCost.processingCost << "\""
+                 << " congestionCost=\"" << switchCost.congestionCost << "\""
+                 << " producerMultiplier=\"" << switchCost.producerMultiplier << "\"/>" << std::endl;
+
+    // 中间计算参数（中层级）
+    m_xmlLogFile << "      <Intermediate timeDelay=\"" << switchCost.timeDelay << "\""
+                 << " baseCongestionCost=\"" << switchCost.baseCongestionCost << "\""
+                 << " TTTT=\"" << switchCost.TTTT << "\""
+                 << " taskStartTime=\"" << switchCost.taskStartTime << "\""
+                 << " priceAtStart=\"" << switchCost.priceAtStart << "\"/>" << std::endl;
+
+    // 底层参数（低层级）
+    m_xmlLogFile << "      <Parameters processingTime=\"" << switchCost.processingTime << "\""
+                 << " queueWaitTime=\"" << switchCost.queueWaitTime << "\""
+                 << " smoothedQueueLength=\"" << switchCost.smoothedQueueLength << "\""
+                 << " pendingTasks=\"" << switchCost.pendingTasks << "\"/>" << std::endl;
+
+    m_xmlLogFile << "    </SwitchTarget>" << std::endl;
 
     m_xmlLogFile << "    <Threshold value=\"" << threshold << "\"/>" << std::endl;
     m_xmlLogFile << "  </Event>" << std::endl;

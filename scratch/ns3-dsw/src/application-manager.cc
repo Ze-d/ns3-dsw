@@ -123,6 +123,9 @@ ApplicationManager::InstallProSinkApps(
                                proPacketSize,
                                simulationStep);
 
+            // 设置所有消费者地址池（用于RTT探测）
+            producerApp->SetConsumerAddresses(sinkAddresses);
+
             // 同样设置 Attribute (与 example 保持一致)
             producerApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
             producerApp->SetAttribute("PacketSize", UintegerValue(proPacketSize));
@@ -157,12 +160,16 @@ ApplicationManager::CreatePriceAwareScheduler(
     const std::map<uint32_t, NodeSpec>& nodeSpecMap,
     const std::vector<Address>& sinkAddresses,
     const std::vector<double>& priceProfile,
-    double queuePenaltyFactor,
     double loadDecayFactor,
-    double producerWeightFactor)
+    double maxCongestionPenalty,
+    double congestionSensitivity,
+    double maxProducerPenalty,
+    double producerSensitivity,
+    std::string logFilePath)
 {
     NS_LOG_FUNCTION(&nodeSpecMap << sinkAddresses.size() << priceProfile.size()
-                    << queuePenaltyFactor << loadDecayFactor << producerWeightFactor);
+                    << loadDecayFactor << maxCongestionPenalty << congestionSensitivity
+                    << maxProducerPenalty << producerSensitivity);
 
     std::vector<ConsumerState> consumers;
 
@@ -204,7 +211,9 @@ ApplicationManager::CreatePriceAwareScheduler(
 
     // 创建调度器
     Ptr<PriceAwareScheduler> scheduler = CreateObject<PriceAwareScheduler>();
-    scheduler->Initialize(consumers, priceProfile, queuePenaltyFactor, loadDecayFactor, producerWeightFactor);
+    scheduler->Initialize(consumers, priceProfile, loadDecayFactor,
+                          maxCongestionPenalty, congestionSensitivity,
+                          maxProducerPenalty, producerSensitivity,logFilePath);
 
     NS_LOG_INFO("Created PriceAwareScheduler with " << consumers.size()
                 << " consumers and load decay factor " << loadDecayFactor);

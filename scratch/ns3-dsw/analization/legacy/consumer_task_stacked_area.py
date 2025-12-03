@@ -5,12 +5,14 @@
 从 pro_sink_stats.xml 文件中提取 EdgeSend 事件，
 按时间窗口统计三个消费者的任务百分比分布，
 生成 100% 堆积面积图。
+遵循 CLAUDE.md 规范：使用 Maple Mono Normal NF CN 字体，300 DPI
 """
 
 import xml.etree.ElementTree as ET
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 from pathlib import Path
 
 # 导入配置
@@ -124,12 +126,30 @@ def plot_stacked_area_chart(pivot_data, output_path):
     plt.close()
 
 def main():
+    import os
+
     # 获取当前脚本所在目录
     script_dir = Path(__file__).parent
 
+    # ================= 参数解析 =================
+    # 优先使用命令行传进来的参数
+    if len(sys.argv) > 1:
+        # 接收命令行参数 (数据目录)
+        data_dir = Path(sys.argv[1])
+    else:
+        # 检查环境变量
+        env_path = os.environ.get("TARGET_ANALYSIS_DIR")
+        if env_path:
+            data_dir = Path(env_path)
+        else:
+            # 回退到默认路径
+            data_dir = script_dir / '../out'
+
+    print(f"[信息] 数据目录: {data_dir}")
+
     # 文件路径（使用相对路径）
-    input_file = script_dir / '../out/pro_sink_stats.xml'
-    output_dir = script_dir / '../out/visualization'
+    input_file = data_dir / 'pro_sink_stats.xml'
+    output_dir = data_dir / 'visualization'
     output_dir.mkdir(exist_ok=True)
     output_file = output_dir / 'consumer_task_stacked_area.png'
 
@@ -138,12 +158,12 @@ def main():
     print(f"共解析 {len(df)} 条 EdgeSend 记录")
 
     print("正在按时间窗口聚合数据...")
-    window_data = aggregate_by_time_window(df, window_size=0.25)
+    window_data = aggregate_by_time_window(df, window_size=1)
     print(f"聚合为 {len(window_data['TimeWindow'].unique())} 个时间窗口 (1s 窗口)")
 
     print("正在应用 2.5s 平滑...")
     # 2.5秒平滑需要2.5个1s窗口，使用3个窗口（3秒）近似
-    pivot_data = apply_smoothing(window_data, span=1)
+    pivot_data = apply_smoothing(window_data, span=3)
 
     print("正在生成堆积面积图...")
     plot_stacked_area_chart(pivot_data, output_file)

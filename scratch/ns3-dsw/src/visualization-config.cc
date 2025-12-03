@@ -33,6 +33,7 @@ VisualizationConfig::SetupLogging(const std::string& levelStr)
     LogComponentEnable("TopoFigureFlowmonCfg", lv);
     LogComponentEnable("ProSinkApp", lv); // 启用新 App 的日志
     LogComponentEnable("LinkUtilizationMonitor", lv); // 启用链路监控日志
+    LogComponentEnable("PriceAwareScheduler", lv);
     NS_LOG_INFO("Logging level set to: " << s);
 }
 

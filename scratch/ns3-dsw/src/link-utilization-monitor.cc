@@ -213,14 +213,14 @@ LinkUtilizationMonitor::PollStats()
     }
 
     // --- 2. 打印控制台表头 ---
-    std::cout << "\n--- Link Utilization Report (" << std::fixed << std::setprecision(2)
-              << now.GetSeconds() << "s, Interval: " << std::setprecision(4) << dt << "s) ---" << std::endl; // [修改] 打印真实 dt
+    NS_LOG_INFO("--- Link Utilization Report (" << std::fixed << std::setprecision(2)
+              << now.GetSeconds() << "s, Interval: " << std::setprecision(4) << dt << "s) ---");
 
     // --- 3. 写入 XML 采样头 ---
     if (m_xmlFile.is_open())
     {
         m_xmlFile << "  <Sample time=\"" << std::fixed << std::setprecision(6) << now.GetSeconds()
-                  << "\" dt=\"" << dt << "\">" << std::endl; // 记录真实 dt
+                  << "\" dt=\"" << dt << "\">" << std::endl; 
     }
 
     double totalUtilPct = 0.0;
@@ -229,18 +229,17 @@ LinkUtilizationMonitor::PollStats()
     // --- 4. 遍历所有注册的链路 ---
     for (auto& link : m_links)
     {
-        // 4.1 从回调累加器中原子地读取并重置字节数
-        // exchange(0) 会返回当前值，并将计数器设置为0
+        // 4.1 原子读取并重置
         uint64_t bytesA = link.intervalBytes_A_to_B.exchange(0);
         uint64_t bytesB = link.intervalBytes_B_to_A.exchange(0);
 
-        // 4.2 计算速率 (R = (Bytes_in_interval) * 8 / dt_actual)
+        // 4.2 计算速率
         double rateA_bps = (bytesA * 8.0) / dt;
         double rateB_bps = (bytesB * 8.0) / dt;
         double rateA_Mbps = rateA_bps / 1e6;
         double rateB_Mbps = rateB_bps / 1e6;
 
-        // 4.3 计算利用率 (U = R / C * 100)
+        // 4.3 计算利用率
         double capacity_bps = link.rate.GetBitRate();
         double capacity_Mbps = capacity_bps / 1e6;
         rateA_Mbps = std::min(rateA_Mbps, capacity_Mbps);
@@ -250,8 +249,8 @@ LinkUtilizationMonitor::PollStats()
 
         totalUtilPct += utilA_pct + utilB_pct;
 
-        // 4.4 打印到控制台 (使用 std::setw 进行对齐)
-        std::cout << "  Link " << std::setw(3) << link.linkId << " (Rate: " 
+        // 4.4 打印到控制台
+        NS_LOG_INFO("  Link " << std::setw(3) << link.linkId << " (Rate: " 
                   << std::fixed << std::setprecision(2) << std::setw(7) 
                   << capacity_Mbps << " Mbps): "
                   << " A(" << std::setw(2) << link.nodeAId << ")->B(" << std::setw(2)
@@ -261,7 +260,7 @@ LinkUtilizationMonitor::PollStats()
                   << " | B(" << std::setw(2) << link.nodeBId << ")->A(" << std::setw(2)
                   << link.nodeAId << "): " << std::fixed << std::setprecision(2)
                   << std::setw(7) << rateB_Mbps << " Mbps (" << std::fixed
-                  << std::setprecision(1) << std::setw(6) << utilB_pct << "%)" << std::endl;
+                  << std::setprecision(1) << std::setw(6) << utilB_pct << "%)");
 
         // 4.5 写入 XML
         if (m_xmlFile.is_open())
@@ -277,10 +276,9 @@ LinkUtilizationMonitor::PollStats()
     }
 
     // --- 5. 打印全局平均利用率 ---
-    // (总利用率 / (链路数 * 2个方向))
     double avgGlobalUtil = (linkCount > 0) ? (totalUtilPct / (linkCount * 2.0)) : 0.0;
-    std::cout << "[Network]: Avg Global Utilization: " << std::fixed << std::setprecision(2)
-              << avgGlobalUtil << "%" << std::endl;
+    NS_LOG_INFO("[Network]: Avg Global Utilization: " << std::fixed << std::setprecision(2)
+              << avgGlobalUtil << "%");
 
     // --- 6. 写入 XML 采样尾 ---
     if (m_xmlFile.is_open())

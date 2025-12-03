@@ -39,6 +39,13 @@ echo "Running ns3 simulation for test..." && \
 --nodeUtilXml=$TEST_OUT_DIR/test.nodeUtil.xml \
 --powerCostXmlBase=$TEST_OUT_DIR/test.powerCost \
 --linkUtilXml=$TEST_OUT_DIR/test.linkUtil.xml \
+--enablePriceAwareScheduling=1 \
+--loadDecayFactor=0.5 \
+--maxCongestionPenalty=0.5 \
+--congestionSensitivity=2.0 \
+--maxProducerPenalty=3.0 \
+--producerSensitivity=100.0 \
+--schedulerLogPath=$TEST_OUT_DIR/scheduler_events.xml \
 "
 
 # 捕获上面命令链的最终退出状态

@@ -1,14 +1,20 @@
 #!/bin/bash
 # ns3-dsw 仿真结果分析与可视化脚本
-# 先生成可视化图表，再计算和显示KPI统计量
-# 使用方法: bash scripts/run_analization.sh
+# 支持指定文件夹进行分析
+# 使用方法: bash scripts/run_analization.sh [文件夹名称或路径]
 
+# ==========================================
 # 颜色定义
+# ==========================================
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# ==========================================
+# 环境准备
+# ==========================================
 
 # 显示标题
 echo -e "${BLUE}========================================${NC}"
@@ -25,13 +31,40 @@ fi
 # 切换到脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")" # 项目根目录
 
-echo -e "${YELLOW}当前目录: $SCRIPT_DIR${NC}"
+# ==========================================
+# 核心逻辑：智能路径解析
+# ==========================================
+DEFAULT_BASE_DIR="$PROJECT_ROOT/out"
+INPUT_TARGET="$1"
+
+# 如果没有提供参数，默认使用 ../out (兼容旧行为)
+if [ -z "$INPUT_TARGET" ]; then
+    echo -e "${YELLOW}未指定目标文件夹，默认分析根目录 out/${NC}"
+    DATA_DIR="$DEFAULT_BASE_DIR"
+else
+    # 1. 检查是否为直接路径 (绝对路径或当前目录下的相对路径)
+    if [ -d "$INPUT_TARGET" ]; then
+        DATA_DIR=$(realpath "$INPUT_TARGET")
+    # 2. 检查是否为 out 目录下的子文件夹名称
+    elif [ -d "${DEFAULT_BASE_DIR}/${INPUT_TARGET}" ]; then
+        DATA_DIR=$(realpath "${DEFAULT_BASE_DIR}/${INPUT_TARGET}")
+    else
+        echo -e "${RED}❌ 错误: 找不到目录: $INPUT_TARGET${NC}"
+        echo -e "   请检查路径是否正确，或该文件夹是否存在于 $DEFAULT_BASE_DIR 下"
+        exit 1
+    fi
+fi
+
+echo -e "${YELLOW}📂 分析目标目录: $DATA_DIR${NC}"
 echo ""
 
-# 检查数据文件
+# ==========================================
+# 文件完整性检查
+# ==========================================
 echo -e "${YELLOW}正在检查数据文件...${NC}"
-DATA_DIR="$SCRIPT_DIR/../out"
+
 REQUIRED_FILES=(
     "$DATA_DIR/node_util.xml"
     "$DATA_DIR/power_cost_node2.xml"
@@ -45,59 +78,65 @@ REQUIRED_FILES=(
 MISSING_FILES=0
 for file in "${REQUIRED_FILES[@]}"; do
     if [ ! -f "$file" ]; then
-        echo -e "${RED}  ❌ 缺少: $file${NC}"
+        echo -e "${RED}  ❌ 缺少: $(basename "$file")${NC}"
         MISSING_FILES=$((MISSING_FILES + 1))
     fi
 done
 
 if [ $MISSING_FILES -gt 0 ]; then
     echo -e "\n${RED}错误: 缺少 $MISSING_FILES 个数据文件${NC}"
-    echo -e "${YELLOW}请先运行仿真生成数据文件:${NC}"
-    echo "  cd $SCRIPT_DIR/.."
-    echo "  sh scripts/run.sh"
+    echo -e "${YELLOW}目录 '$DATA_DIR' 数据不完整。${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}✅ 所有数据文件都存在${NC}"
 echo ""
 
+# 切换到项目根目录运行 Python
+cd "$PROJECT_ROOT" || exit 1
+
 # ========================================================================
-# 第一步：生成可视化图表
+# 第一步：生成分析报告 (JSON格式)
 # ========================================================================
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE} 第一步：生成可视化图表${NC}"
+echo -e "${BLUE} 第一步：生成分析报告${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# 切换到项目根目录，然后运行可视化脚本
-cd "$SCRIPT_DIR/.." || exit 1
-if python3 analization/generate_all_visualizations.py; then
+if python3 analization/run_analysis.py "$DATA_DIR"; then
     echo ""
-    echo -e "${GREEN}✅ 可视化生成完成！${NC}"
-    echo ""
-    echo -e "${BLUE}生成的图表:${NC}"
-    ls -lh "$SCRIPT_DIR/../out/visualization/"*.png 2>/dev/null | awk '{print "  📊 " $9 " (" $5 ")"}'
-    echo ""
-    echo -e "${BLUE}图表位置:${NC} $SCRIPT_DIR/../out/visualization/"
+    echo -e "${GREEN}✅ 分析报告生成完成！${NC}"
     echo ""
 else
-    echo ""
-    echo -e "${RED}========================================${NC}"
-    echo -e "${RED}❌ 可视化生成失败${NC}"
-    echo -e "${RED}========================================${NC}"
+    echo -e "${RED}❌ 分析报告生成失败${NC}"
     exit 1
 fi
 
 # ========================================================================
-# 第二步：计算和显示KPI统计量
+# 第二步：生成可视化图表
 # ========================================================================
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE} 第二步：计算KPI统计量${NC}"
+echo -e "${BLUE} 第二步：生成可视化图表${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# 运行KPI计算脚本
-OUT_DIR="$DATA_DIR" python3 analization/calculate_kpi.py
+# 确保可视化输出目录存在 (在目标数据文件夹内新建 visualization 文件夹)
+mkdir -p "$DATA_DIR/visualization"
+
+if python3 analization/run_visualization.py "$DATA_DIR"; then
+    echo ""
+    echo -e "${GREEN}✅ 可视化生成完成！${NC}"
+    echo ""
+    echo -e "${BLUE}生成的图表:${NC}"
+    # 这里的 ls 路径也动态化了
+    ls -lh "$DATA_DIR/visualization/"*.png 2>/dev/null | awk '{print "  📊 " $9 " (" $5 ")"}'
+    echo ""
+    echo -e "${BLUE}图表位置:${NC} $DATA_DIR/visualization/"
+    echo ""
+else
+    echo -e "${RED}❌ 可视化生成失败${NC}"
+    exit 1
+fi
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
@@ -105,6 +144,7 @@ echo -e "${GREEN}✅ 分析完成！${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}总结:${NC}"
-echo "  1. 可视化图表已生成到: $SCRIPT_DIR/../out/visualization/"
-echo "  2. KPI统计量已计算完成"
+echo "  1. 数据来源: $DATA_DIR"
+echo "  2. 分析报告: $DATA_DIR/analysis_report.json"
+echo "  3. 可视化图表: $DATA_DIR/visualization/"
 echo ""

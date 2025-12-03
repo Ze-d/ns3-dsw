@@ -289,8 +289,14 @@ main(int argc, char* argv[])
 
     // --- 价格感知调度参数 ---
     bool enablePriceAwareScheduling = false; // 默认关闭
-    double queuePenaltyFactor = 0.1; // 队列积压惩罚系数
     double loadDecayFactor = 0.5; // 负载衰减因子 (0.0=无衰减, 1.0=完全衰减)
+    std::string schedulerLogPath = "scratch/ns3-dsw/out/scheduler_events.xml";
+    // Tanh 归一化成本函数参数
+    double maxCongestionPenalty = 0.5;    // W_base: 最大拥塞惩罚
+    double congestionSensitivity = 2.0;   // K_c: 拥塞敏感度（秒）
+    double maxProducerPenalty = 3.0;      // W_prod: 最大生产者紧急度乘数
+    double producerSensitivity = 100.0;   // K_p: 生产者敏感度（任务数）
+
     // --- End MODIFICATION ---
 
     CommandLine cmd;
@@ -331,8 +337,12 @@ main(int argc, char* argv[])
 
     // --- 价格感知调度命令行参数 ---
     cmd.AddValue("enablePriceAwareScheduling", "Enable Price-Aware Task Scheduling (0/1)", enablePriceAwareScheduling);
-    cmd.AddValue("queuePenaltyFactor", "Queue penalty factor for price-aware scheduling", queuePenaltyFactor);
     cmd.AddValue("loadDecayFactor", "Load decay factor for price-aware scheduling (0.0-1.0)", loadDecayFactor);
+    cmd.AddValue("maxCongestionPenalty", "Max congestion penalty (W_base)", maxCongestionPenalty);
+    cmd.AddValue("congestionSensitivity", "Congestion sensitivity in seconds (K_c)", congestionSensitivity);
+    cmd.AddValue("maxProducerPenalty", "Max producer urgency multiplier (W_prod)", maxProducerPenalty);
+    cmd.AddValue("producerSensitivity", "Producer sensitivity in tasks (K_p)", producerSensitivity);
+    cmd.AddValue("schedulerLogPath", "Path to scheduler events XML log", schedulerLogPath);
 
     cmd.Parse(argc, argv);
     VisualizationConfig::SetupLogging(logLevel);
@@ -534,13 +544,12 @@ main(int argc, char* argv[])
     if (enablePriceAwareScheduling)
     {
         NS_LOG_INFO("Creating PriceAwareScheduler...");
-        // 生产者压力权重因子默认为0.15（根据TASK.md）
-        double producerWeightFactor = 0.15;
         scheduler = ApplicationManager::CreatePriceAwareScheduler(
-            nodeSpecMap, sinkAddresses, priceProfile, queuePenaltyFactor, loadDecayFactor, producerWeightFactor);
+            nodeSpecMap, sinkAddresses, priceProfile, loadDecayFactor,
+            maxCongestionPenalty, congestionSensitivity,
+            maxProducerPenalty, producerSensitivity, schedulerLogPath);
         g_scheduler = scheduler; // 设置全局变量
-        NS_LOG_INFO("PriceAwareScheduler created successfully with load decay factor " << loadDecayFactor
-                   << " and producer weight factor " << producerWeightFactor);
+        NS_LOG_INFO("PriceAwareScheduler created successfully with load decay factor " << loadDecayFactor);
     }
 
     // 使用 ApplicationManager 安装所有应用
