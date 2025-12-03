@@ -92,27 +92,23 @@ fi
 echo -e "${GREEN}✅ 所有数据文件都存在${NC}"
 echo ""
 
-# 为了方便 Python 脚本读取，我们这里设置一个环境变量 (作为双重保险)
-export TARGET_ANALYSIS_DIR="$DATA_DIR"
-
-# ========================================================================
-# 第一步：提取任务延迟数据
-# ========================================================================
-echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE} 第一步：提取任务延迟数据${NC}"
-echo -e "${BLUE}========================================${NC}"
-echo ""
-
 # 切换到项目根目录运行 Python
 cd "$PROJECT_ROOT" || exit 1
 
-# ⚠️ 注意：我们在命令最后传入了 "$DATA_DIR" 参数
-if python3 analization/extract_task_latency.py "$DATA_DIR"; then
+# ========================================================================
+# 第一步：生成分析报告 (JSON格式)
+# ========================================================================
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE} 第一步：生成分析报告${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+if python3 analization/run_analysis.py "$DATA_DIR"; then
     echo ""
-    echo -e "${GREEN}✅ 任务延迟数据提取完成！${NC}"
+    echo -e "${GREEN}✅ 分析报告生成完成！${NC}"
     echo ""
 else
-    echo -e "${RED}❌ 任务延迟数据提取失败${NC}"
+    echo -e "${RED}❌ 分析报告生成失败${NC}"
     exit 1
 fi
 
@@ -127,7 +123,7 @@ echo ""
 # 确保可视化输出目录存在 (在目标数据文件夹内新建 visualization 文件夹)
 mkdir -p "$DATA_DIR/visualization"
 
-if python3 analization/generate_all_visualizations.py "$DATA_DIR"; then
+if python3 analization/run_visualization.py "$DATA_DIR"; then
     echo ""
     echo -e "${GREEN}✅ 可视化生成完成！${NC}"
     echo ""
@@ -142,24 +138,6 @@ else
     exit 1
 fi
 
-# ========================================================================
-# 第三步：计算和显示KPI统计量
-# ========================================================================
-echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE} 第三步：计算KPI统计量${NC}"
-echo -e "${BLUE}========================================${NC}"
-echo ""
-
-echo -e "${YELLOW}正在计算基础KPI统计量...${NC}"
-# 这里通过环境变量 OUT_DIR 传递 (兼容你的旧脚本逻辑)，同时也作为参数传递
-OUT_DIR="$DATA_DIR" python3 analization/calculate_kpi.py "$DATA_DIR"
-
-echo -e "\n${YELLOW}正在计算任务延迟时间序列...${NC}"
-python3 analization/task_latency_timeseries.py "$DATA_DIR"
-
-echo -e "\n${YELLOW}正在计算任务延迟KPI统计...${NC}"
-python3 analization/calculate_task_latency_kpi.py "$DATA_DIR"
-
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}✅ 分析完成！${NC}"
@@ -167,6 +145,6 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}总结:${NC}"
 echo "  1. 数据来源: $DATA_DIR"
-echo "  2. 可视化图表: $DATA_DIR/visualization/"
-echo "  3. KPI统计量已计算完成"
+echo "  2. 分析报告: $DATA_DIR/analysis_report.json"
+echo "  3. 可视化图表: $DATA_DIR/visualization/"
 echo ""
