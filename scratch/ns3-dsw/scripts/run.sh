@@ -11,11 +11,11 @@ DATA_DIR="scratch/ns3-dsw/data"
 # 参数解析
 # ==========================================
 ENABLE_PRICE_SCHEDULING=1
-LOAD_DECAY_FACTOR=0.5
-MAX_CONGESTION_PENALTY=0.5
-CONGESTION_SENSITIVITY=2.0
-MAX_PRODUCER_PENALTY=3.0
-PRODUCER_SENSITIVITY=100.0
+LOAD_DECAY_FACTOR=0.6
+MAX_CONGESTION_PENALTY=10
+CONGESTION_SENSITIVITY=4
+MAX_PRODUCER_PENALTY=1
+PRODUCER_SENSITIVITY=150
 LOG_LEVEL="all"
 
 # 新增：用于存储用户自定义的子文件夹名
@@ -176,6 +176,7 @@ EOF
 # ==========================================
 echo "================================================"
 echo "动态成本感知调度仿真 (Dynamic Cost-Aware Scheduling)"
+echo "默认模式: 负载均衡 (Load Balancing)"
 echo "Output Folder: $CURRENT_OUT_DIR"
 echo "================================================"
 
