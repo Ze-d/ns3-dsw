@@ -16,7 +16,7 @@ MAX_CONGESTION_PENALTY=0.5
 CONGESTION_SENSITIVITY=2.0
 MAX_PRODUCER_PENALTY=3.0
 PRODUCER_SENSITIVITY=100.0
-LOG_LEVEL="off"
+LOG_LEVEL="all"
 
 # 新增：用于存储用户自定义的子文件夹名
 CUSTOM_SUBDIR=""
@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --disableLogs)
-            LOG_LEVEL="off"
+            LOG_LEVEL="$2"
             shift
             ;;
         *)
@@ -132,6 +132,7 @@ CMD="topo_figure_flowmon_cfg_integrated \
 --enablePowerCoupling=1 \
 --priceCsv=${DATA_DIR}/daily_price.csv \
 --powerCostXmlBase=${CURRENT_OUT_DIR}/power_cost \
+--burstEventsXmlBase=${CURRENT_OUT_DIR}/burst_events \
 --enablePriceAwareScheduling=$ENABLE_PRICE_SCHEDULING \
 --loadDecayFactor=$LOAD_DECAY_FACTOR \
 --maxCongestionPenalty=$MAX_CONGESTION_PENALTY \
@@ -193,6 +194,13 @@ fi
 
 # 1. 定义清理函数：恢复光标可见，恢复输入回显
 cleanup() {
+    if [ -n "$SIM_PID" ] && kill -0 $SIM_PID 2>/dev/null; then
+        echo -e "\n\n[Cleanup] Detected Ctrl+C (SIGINT). Stopping NS-3 simulation (PID $SIM_PID)..." >&2
+        # 发送 SIGINT 信号给 NS-3 进程
+        kill $SIM_PID
+        wait $SIM_PID 2>/dev/null # 等待其干净退出
+        echo "[Cleanup] NS-3 process stopped." >&2
+    fi
     tput cnorm   # 恢复光标 (cursor normal)
     stty echo    # 恢复输入回显
 }

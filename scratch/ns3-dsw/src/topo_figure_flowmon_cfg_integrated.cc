@@ -251,11 +251,11 @@ OnSinkQueueLengthForScheduler(uint32_t nodeId, uint32_t queueLength)
 int
 main(int argc, char* argv[])
 {
-    std::string nodesCsv = "scratch/nodes.csv";
-    std::string linksCsv = "scratch/links.csv";
+    std::string nodesCsv = "scratch/data/nodes.csv";
+    std::string linksCsv = "scratch/data/links.csv";
     std::string logLevel = "info"; // off|warn|info|debug|all
-    double warmupTime = 6.0;     // 仿真预热时间 (s) - [MODIFIED]
-    double simDuration = 24.0;   // 实际仿真时间 (s, 1s=1h) - [MODIFIED]
+    double warmupTime = 0;     // 仿真预热时间 (s)
+    double simDuration = 24.0;   // 实际仿真时间 (s, 1s=1h)
     
     std::string flowmonXml = "scratch/ns3-dsw/out/flowmon.xml";
     std::string statsCsv = "scratch/ns3-dsw/out/flowstats.csv"; // 若非空则导出 CSV 指标
@@ -279,8 +279,9 @@ main(int argc, char* argv[])
 
     // --- 功率/成本 参数 ---
     bool enablePowerCoupling = false; // 默认关闭
-    std::string priceCsv = "daily_price.csv";
-    std::string powerCostXmlBase = "scratch/ns3-dsw/out/power_cost"; 
+    std::string priceCsv = "scratch/data/daily_price.csv";
+    std::string powerCostXmlBase = "scratch/ns3-dsw/out/power_cost";
+    std::string burstEventsXmlBase = "scratch/ns3-dsw/out/burst_events";
 
     // --- 链路监控参数 ---
     double linkUtilIntervalSec = 0.25; // 默认 0.25s 轮询
@@ -292,9 +293,9 @@ main(int argc, char* argv[])
     double loadDecayFactor = 0.5; // 负载衰减因子 (0.0=无衰减, 1.0=完全衰减)
     std::string schedulerLogPath = "scratch/ns3-dsw/out/scheduler_events.xml";
     // Tanh 归一化成本函数参数
-    double maxCongestionPenalty = 0.5;    // W_base: 最大拥塞惩罚
+    double maxCongestionPenalty = 10;    // W_base: 最大拥塞惩罚
     double congestionSensitivity = 2.0;   // K_c: 拥塞敏感度（秒）
-    double maxProducerPenalty = 3.0;      // W_prod: 最大生产者紧急度乘数
+    double maxProducerPenalty = 1.0;      // W_prod: 最大生产者紧急度乘数
     double producerSensitivity = 100.0;   // K_p: 生产者敏感度（任务数）
 
     // --- End MODIFICATION ---
@@ -329,6 +330,7 @@ main(int argc, char* argv[])
     cmd.AddValue("enablePowerCoupling", "Enable Power/Cost Coupling features (0/1)", enablePowerCoupling);
     cmd.AddValue("priceCsv", "Path to the 288-point (5min) price CSV", priceCsv);
     cmd.AddValue("powerCostXmlBase", "Base path for power/cost XML output", powerCostXmlBase);
+    cmd.AddValue("burstEventsXmlBase", "Base path for burst events XML output", burstEventsXmlBase);
 
     // --- 链路监控命令行参数 ---
     cmd.AddValue("enableLinkUtil", "Enable Link Utilization Monitor (0/1)", enableLinkUtil);
@@ -555,7 +557,7 @@ main(int argc, char* argv[])
     // 使用 ApplicationManager 安装所有应用
     auto installResult = ApplicationManager::InstallProSinkApps(
         nodes, nodeSpecMap, nodeIds, sinkAddresses, enablePowerCoupling, priceProfile,
-        powerCostXmlBase, proAppStartTime, proAppStopTime, simulationStep,
+        powerCostXmlBase, burstEventsXmlBase, proAppStartTime, proAppStopTime, simulationStep,
         proAppUpdateInterval, proTaskSize, proPacketSize, warmupTime);
 
     std::vector<Ptr<MyProducer>>& producers = installResult.producers;

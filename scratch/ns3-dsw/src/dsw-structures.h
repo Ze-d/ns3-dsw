@@ -102,6 +102,9 @@ struct NodeSpec
     double basePower = 0.0;     // MW
     double fullPower = 0.0;     // MW
     double phaseOffset = 0.0;   // hours
+
+    // --- Mixed-Payload: 泊松簇过程参数 ---
+    double burstMean = 1.0;     // 平均突发大小 (泊松簇过程的簇大小均值)
 };
 
 struct LinkSpec

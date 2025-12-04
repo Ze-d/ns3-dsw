@@ -42,7 +42,16 @@ def main():
         "global_kpi": metrics.get_global_kpi(),
         "latency_stats": metrics.get_latency_stats()
     }
-    
+
+    # 3.5. 电价驱动调度分析
+    print("正在分析电价驱动调度...")
+    price_analysis = metrics.analyze_price_driven_scheduling()
+    if "error" not in price_analysis:
+        report["price_driven_analysis"] = price_analysis
+        print(f"  ✓ 切换率: {price_analysis['switch_rate']*100:.1f}%")
+    else:
+        print(f"  ⚠ 跳过电价分析: {price_analysis['error']}")
+
     # 4. 生成 CSV (兼容旧接口: task_latency_trace.csv)
     # 这一步是为了让那些依赖 CSV 的旧工具（如果有的话）还能工作
     csv_path = data_dir / 'task_latency_trace.csv'

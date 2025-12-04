@@ -89,13 +89,14 @@ DataParser::LoadCsvNodes(const std::string& path)
             continue;
 
         std::stringstream ss(s);
-        std::string fid, fx, fy, fname, frate, fbaseP, ffullP, fphase;
+        std::string fid, fx, fy, fname, frate, fburstmean, fbaseP, ffullP, fphase;
 
         std::getline(ss, fid, ',');
         std::getline(ss, fx, ',');
         std::getline(ss, fy, ',');
         std::getline(ss, fname, ',');
         std::getline(ss, frate, ',');
+        std::getline(ss, fburstmean, ',');
         std::getline(ss, fbaseP, ',');
         std::getline(ss, ffullP, ',');
         std::getline(ss, fphase);
@@ -106,6 +107,7 @@ DataParser::LoadCsvNodes(const std::string& path)
         fy = DswUtils::Trim(fy);
         fname = DswUtils::Trim(fname);
         frate = DswUtils::Trim(frate);
+        fburstmean = DswUtils::Trim(fburstmean);
         fbaseP = DswUtils::Trim(fbaseP);
         ffullP = DswUtils::Trim(ffullP);
         fphase = DswUtils::Trim(fphase);
@@ -160,6 +162,31 @@ DataParser::LoadCsvNodes(const std::string& path)
                 NS_LOG_WARN("Skip node line " << ln << ": Rate must be positive, got "
                                               << ns.appRate);
                 continue;
+            }
+
+            // 解析突发大小（burstMean）- 仅对生产者有意义
+            if (!fburstmean.empty())
+            {
+                try
+                {
+                    ns.burstMean = std::stod(fburstmean);
+                    if (ns.burstMean <= 0.0)
+                    {
+                        NS_LOG_WARN("Node line " << ln << ": burstMean must be positive, using default 1.0");
+                        ns.burstMean = 1.0;
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    NS_LOG_WARN("Node line " << ln << ": Invalid burstMean value '" << fburstmean
+                                             << "', using default 1.0 (" << e.what() << ")");
+                    ns.burstMean = 1.0;
+                }
+            }
+            else
+            {
+                // 对于core节点或未指定的情况，使用默认值
+                ns.burstMean = (ns.type == NodeType::PRODUCER) ? 1.0 : 0.0;
             }
 
             if (ns.type == NodeType::CONSUMER)
