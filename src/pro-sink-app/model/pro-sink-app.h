@@ -189,7 +189,7 @@ public:
     MyProducer();
     virtual ~MyProducer();
 
-    void Setup(Address sinkAddress, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
+    void Setup(Address sinkAddress, double lambda, double burstMean, uint32_t taskSize, uint32_t packetSize, Time simulationStep);
 
     /**
      * @brief 启用价格感知调度
@@ -223,6 +223,26 @@ public:
      * @param sinkAddresses 所有已知消费者的地址列表
      */
     void SetConsumerAddresses(const std::vector<Address>& sinkAddresses);
+
+    /**
+     * @brief 设置突发事件XML文件路径
+     * @param xmlPath XML文件路径
+     */
+    void SetBurstEventsXmlPath(const std::string& xmlPath);
+
+    /**
+     * @brief 记录突发事件
+     * @param burstSize 实际突发大小
+     * @param burstMean 预期突发均值
+     * @param burstVariance 突发方差
+     */
+    void LogBurstEvent(double burstSize, double burstMean, double burstVariance);
+
+    /**
+     * @brief 获取总突发数
+     * @return 总突发数
+     */
+    uint32_t GetTotalBursts() const;
 
     TracedCallback<uint32_t, uint32_t, Address> m_taskSentTrace;
 
@@ -268,7 +288,10 @@ private:
 
     Time m_simulationStep;
     double m_lambda;
-    Ptr<ExponentialRandomVariable> m_interTaskTimeGenerator;
+    double m_burstMean;  // 平均突发大小（泊松簇过程参数）
+    Ptr<ExponentialRandomVariable> m_interTaskTimeGenerator;     // 原有的任务间隔生成器（保留以保持向后兼容）
+    Ptr<ExponentialRandomVariable> m_interarrivalRng;            // 簇间间隔生成器（指数分布）
+    Ptr<NormalRandomVariable> m_burstSizeRng;                    // 突发大小生成器（正态分布）
     std::queue<bool> m_taskQueue;
 
     bool m_running;
@@ -280,6 +303,12 @@ private:
     double m_switchThreshold;  // 切换阈值（带随机扰动，避免从众切换）
     uint32_t m_taskCounter;  // 任务计数器，用于降低决策频率（每5个任务检查一次）
     uint32_t m_decisionInterval;  // 决策间隔（每5个任务）
+
+    // --- 突发事件记录相关 ---
+    std::ofstream m_burstEventsXmlFile;    // 突发事件XML文件流
+    std::string m_burstEventsXmlPath;      // 突发事件XML文件路径
+    uint32_t m_burstEventCounter;          // 事件计数器（用于ID）
+    uint32_t m_totalBursts;                // 总突发数统计
 
 };
 

@@ -724,7 +724,11 @@ MyProducer::MyProducer()
       m_scheduler(nullptr),
       m_switchThreshold(0.25),  // 默认25%阈值
       m_taskCounter(0),
-      m_decisionInterval(5)  // 每5个任务检查一次
+      m_decisionInterval(5),  // 每5个任务检查一次
+      m_burstEventsXmlFile(),
+      m_burstEventsXmlPath(),
+      m_burstEventCounter(0),
+      m_totalBursts(0)
 {
 }
 
@@ -734,15 +738,28 @@ MyProducer::~MyProducer()
 }
 
 void
-MyProducer::Setup(Address sinkAddress, double lambda, uint32_t taskSize, uint32_t packetSize, Time simulationStep)
+MyProducer::Setup(Address sinkAddress, double lambda, double burstMean, uint32_t taskSize, uint32_t packetSize, Time simulationStep)
 {
     m_peerAddress = sinkAddress; // TCP 连接到单个对端
     m_taskSize = taskSize;
     m_packetSize = packetSize;
     m_simulationStep = simulationStep;
     m_lambda = lambda;
+    m_burstMean = burstMean;
+
+    // 原有的任务间隔生成器（保留以保持向后兼容）
     m_interTaskTimeGenerator = CreateObject<ExponentialRandomVariable>();
     m_interTaskTimeGenerator->SetAttribute("Mean", DoubleValue(1.0 / m_lambda));
+
+    // 新的泊松簇过程随机变量生成器
+    // 簇间间隔：指数分布，平均值 = burstMean / lambda
+    m_interarrivalRng = CreateObject<ExponentialRandomVariable>();
+    m_interarrivalRng->SetAttribute("Mean", DoubleValue(std::max(0.001, m_burstMean / m_lambda)));
+
+    // 突发大小：正态分布，均值 = burstMean，标准差 = 0.2 * burstMean
+    m_burstSizeRng = CreateObject<NormalRandomVariable>();
+    m_burstSizeRng->SetAttribute("Mean", DoubleValue(m_burstMean));
+    m_burstSizeRng->SetAttribute("Variance", DoubleValue(std::max(0.01, 0.04 * m_burstMean * m_burstMean)));
 }
 
 void
@@ -787,6 +804,63 @@ MyProducer::SetConsumerAddresses(const std::vector<Address>& sinkAddresses)
 }
 
 void
+MyProducer::SetBurstEventsXmlPath(const std::string& xmlPath)
+{
+    NS_LOG_FUNCTION(this << xmlPath);
+    m_burstEventsXmlPath = xmlPath;
+}
+
+void
+MyProducer::LogBurstEvent(double burstSize, double burstMean, double burstVariance)
+{
+    if (!m_burstEventsXmlFile.is_open())
+    {
+        return; // 文件未打开，不记录
+    }
+
+    m_burstEventCounter++;
+    m_totalBursts++;
+
+    double nowSeconds = Simulator::Now().GetSeconds();
+
+    // 记录突发事件到XML文件
+    m_burstEventsXmlFile << "  <BurstEvent id=\"" << m_burstEventCounter
+                        << "\" time=\"" << nowSeconds
+                        << "\" producerNodeId=\"" << GetNode()->GetId()
+                        << "\">" << std::endl;
+
+    m_burstEventsXmlFile << "    <BurstSize actual=\"" << burstSize
+                        << "\" expectedMean=\"" << burstMean
+                        << "\" stdDeviation=\"" << std::sqrt(burstVariance)
+                        << "\"/>" << std::endl;
+
+    m_burstEventsXmlFile << "    <BurstParameters interarrivalMean=\""
+                        << (m_burstMean / m_lambda)
+                        << "\" burstMean=\"" << burstMean
+                        << "\" burstVariance=\"" << burstVariance
+                        << "\"/>" << std::endl;
+
+    m_burstEventsXmlFile << "    <Statistics totalTasksGenerated=\"" << m_totalTasksGenerated
+                        << "\" totalBursts=\"" << m_totalBursts
+                        << "\" avgBurstSize=\"" << (static_cast<double>(m_totalTasksGenerated) / m_totalBursts)
+                        << "\"/>" << std::endl;
+
+    m_burstEventsXmlFile << "  </BurstEvent>" << std::endl;
+
+    // 每10个事件刷新一次文件，减少I/O开销
+    if (m_burstEventCounter % 10 == 0)
+    {
+        m_burstEventsXmlFile.flush();
+    }
+}
+
+uint32_t
+MyProducer::GetTotalBursts() const
+{
+    return m_totalBursts;
+}
+
+void
 MyProducer::StartApplication()
 {
     // 初始化随机切换阈值（25% ± 5%，避免从众切换）
@@ -805,6 +879,24 @@ MyProducer::StartApplication()
 
     NS_LOG_INFO("Producer Node " << GetNode()->GetId() << ": Switch threshold initialized to "
                << std::fixed << std::setprecision(3) << (m_switchThreshold * 100) << "%");
+
+    // 打开突发事件XML文件（如果路径已设置）
+    if (!m_burstEventsXmlPath.empty())
+    {
+        m_burstEventsXmlFile.open(m_burstEventsXmlPath.c_str());
+        if (m_burstEventsXmlFile.is_open())
+        {
+            m_burstEventsXmlFile << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
+            m_burstEventsXmlFile << "<BurstEvents>" << std::endl;
+            m_burstEventsXmlFile << std::fixed << std::setprecision(6);
+            NS_LOG_INFO("Producer Node " << GetNode()->GetId() << ": Burst events XML file opened: " << m_burstEventsXmlPath);
+        }
+        else
+        {
+            NS_LOG_ERROR("Producer Node " << GetNode()->GetId() << ": Failed to open burst events XML file: " << m_burstEventsXmlPath);
+            m_burstEventsXmlPath.clear(); // 清空路径，避免后续尝试
+        }
+    }
 
     // 创建UDP套接字用于RTT探测
     if (!m_consumerAddresses.empty())
@@ -848,8 +940,17 @@ MyProducer::StopApplication()
 {
     m_running = false; // 1. 信号：停止生成新任务和接受新任务
 
-    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 停止生产新任务, 总共发送任务数: " << m_totalTasksSent 
+    NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 停止生产新任务, 总共发送任务数: " << m_totalTasksSent
                   << ". 队列中剩余任务数: " << m_taskQueue.size());
+
+    // 关闭突发事件XML文件
+    if (m_burstEventsXmlFile.is_open())
+    {
+        m_burstEventsXmlFile << "</BurstEvents>" << std::endl;
+        m_burstEventsXmlFile.close();
+        NS_LOG_INFO("Producer Node " << GetNode()->GetId() << ": Burst events XML file closed. Total bursts: " << m_totalBursts);
+    }
+
     // 2. 检查是否可以立即停止
     if (!m_isSending)
     {
@@ -858,7 +959,7 @@ MyProducer::StopApplication()
         if (m_socket != nullptr && m_connected) // 检查 m_connected 避免在未连接时关闭
         {
             m_socket->Close();
-            m_connected = false; 
+            m_connected = false;
         }
     }
     // 3. 如果 m_isSending == true，则什么也不做。
@@ -915,34 +1016,41 @@ void
 MyProducer::GenerateTasks()
 {
     if (!m_running) return;
-    uint32_t numTasksToGenerate = 0;
-    double timeElapsedInStep = 0.0;
-    while (true)
+
+    // --- 泊松簇过程 (Poisson Cluster Process) ---
+    // A. 生成本次突发的任务数量（正态分布，均值 = m_burstMean）
+    double burstSize = m_burstSizeRng->GetValue();
+    // 确保突发大小至少为1（至少生成一个任务）
+    int currentBurstSize = std::max(1, static_cast<int>(std::round(burstSize)));
+
+    // B. 将突发中的所有任务加入队列
+    if (currentBurstSize > 0)
     {
-        double nextInterval = m_interTaskTimeGenerator->GetValue();
-        if (timeElapsedInStep + nextInterval > m_simulationStep.GetSeconds())
-        {
-            break; 
-        }
-        timeElapsedInStep += nextInterval;
-        numTasksToGenerate++;
-    }
-    if (numTasksToGenerate > 0)
-    {
-         NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId() << "]: 生成了 " << numTasksToGenerate << " 个新任务。");
-        for (uint32_t i = 0; i < numTasksToGenerate; ++i)
+        NS_LOG_INFO(Simulator::Now().GetSeconds() << "s: [生产者 " << GetNode()->GetId()
+                                                  << "]: 突发生成 " << currentBurstSize << " 个新任务 (burstMean="
+                                                  << m_burstMean << ")");
+
+        for (int i = 0; i < currentBurstSize; ++i)
         {
             m_taskQueue.push(true);
         }
-        m_totalTasksGenerated += numTasksToGenerate;  // 累计生成任务数
+        m_totalTasksGenerated += currentBurstSize;  // 累计生成任务数
+
+        // 记录突发事件到XML文件
+        LogBurstEvent(currentBurstSize, m_burstMean, m_burstSizeRng->GetVariance());
+
+        // 如果当前没有在发送任务，立即尝试启动发送
         if (!m_isSending)
         {
-            SendNextTask(); // 尝试启动发送
+            SendNextTask();
         }
     }
+
+    // C. 安排下一次突发（指数分布，间隔 = m_burstMean / m_lambda）
     if (m_running)
     {
-        Simulator::Schedule(m_simulationStep, &MyProducer::GenerateTasks, this);
+        Time nextBurstTime = Seconds(m_interarrivalRng->GetValue());
+        Simulator::Schedule(nextBurstTime, &MyProducer::GenerateTasks, this);
     }
 }
 

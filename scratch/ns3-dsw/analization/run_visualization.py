@@ -75,6 +75,43 @@ def main():
     print("8. 生成单位电价曲线图...")
     plots.plot_price_per_MWh(power_dict, vis_dir / 'price_per_MWh.png')
 
+    # (9) 流量生成脉冲图 (混合负载分析)
+    print("9. 生成流量生成脉冲图...")
+    try:
+        burst_data = loader.load_burst_events()
+        if burst_data:
+            plots.plot_traffic_generation_impulse(burst_data, vis_dir / 'traffic_generation_impulse.png')
+        else:
+            print("  [跳过] 缺少burst_events数据")
+    except Exception as e:
+        print(f"  [跳过] 无法生成脉冲图: {e}")
+
+    # (10) 生产者积压演化图
+    print("10. 生成生产者积压演化图...")
+    try:
+        events_df = loader.load_pro_sink_events()
+        if not events_df.empty:
+            plots.plot_producer_backlog_evolution(events_df, vis_dir / 'producer_backlog_evolution.png')
+        else:
+            print("  [跳过] 缺少pro_sink_events数据")
+    except Exception as e:
+        print(f"  [跳过] 无法生成积压演化图: {e}")
+
+    # (11) 到达间隔时间CDF图
+    print("11. 生成到达间隔时间CDF图...")
+    try:
+        burst_data = loader.load_burst_events()
+        if burst_data:
+            interval_df = loader.get_burst_intervals(burst_data)
+            if not interval_df.empty:
+                plots.plot_interarrival_time_cdf(interval_df, vis_dir / 'interarrival_time_cdf.png')
+            else:
+                print("  [跳过] 间隔计算结果为空")
+        else:
+            print("  [跳过] 缺少burst_events数据")
+    except Exception as e:
+        print(f"  [跳过] 无法生成CDF图: {e}")
+
     print("\n[完成] 所有图表已生成完毕。")
 
 if __name__ == "__main__":

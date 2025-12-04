@@ -37,6 +37,7 @@ public:
         bool enablePowerCoupling,
         const std::vector<double>& priceProfile,
         const std::string& powerCostXmlBase,
+        const std::string& burstEventsXmlBase,
         double proAppStartTime,
         double proAppStopTime,
         Time simulationStep,

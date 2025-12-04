@@ -12,7 +12,6 @@ import os
 from matplotlib import font_manager
 
 # ================= 配置区域 =================
-# 字体设置 - 使用 CLAUDE.md 规范
 FONT_NAME = 'Maple Mono Normal NF CN'
 FONT_FILE = 'MapleMonoNormal-NF-CN-Regular.ttf'
 FONT_PATH = '/media/pw/e97fdd05-9516-4082-826b-eb44c3458a4c/Data/HR/.local/share/fonts/MapleMonoNormal-NF-CN-Regular.ttf'

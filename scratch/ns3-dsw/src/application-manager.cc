@@ -22,6 +22,7 @@ ApplicationManager::InstallProSinkApps(
     bool enablePowerCoupling,
     const std::vector<double>& priceProfile,
     const std::string& powerCostXmlBase,
+    const std::string& burstEventsXmlBase,
     double proAppStartTime,
     double proAppStopTime,
     Time simulationStep,
@@ -119,12 +120,22 @@ ApplicationManager::InstallProSinkApps(
 
             producerApp->Setup(targetSink, // 传递单个 Address
                                ns.appRate,
+                               ns.burstMean,  // 传递平均突发大小（泊松簇过程参数）
                                proTaskSize,
                                proPacketSize,
                                simulationStep);
 
             // 设置所有消费者地址池（用于RTT探测）
             producerApp->SetConsumerAddresses(sinkAddresses);
+
+            // 设置突发事件XML文件路径（仅对Producer）
+            if (!burstEventsXmlBase.empty())
+            {
+                std::string burstEventsXmlPath = burstEventsXmlBase + "_node" + std::to_string(ns.id) + ".xml";
+                NS_LOG_INFO("Node " << ns.id << " (Producer) enabling burst events logging. Output -> "
+                                   << burstEventsXmlPath);
+                producerApp->SetBurstEventsXmlPath(burstEventsXmlPath);
+            }
 
             // 同样设置 Attribute (与 example 保持一致)
             producerApp->SetAttribute("TaskSize", UintegerValue(proTaskSize));
