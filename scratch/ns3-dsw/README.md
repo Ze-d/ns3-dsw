@@ -42,11 +42,11 @@ scratch/ns3-dsw/
 
 * 负载均衡 
 
-sh scratch/ns3-dsw/scripts/run.sh --enablePriceAwareScheduling 1 --loadDecayFactor 0.6 --maxCongestionPenalty 10 --congestionSensitivity 4 --maxProducerPenalty 1 --producerSensitivity 150 --logLevel all 
+bash scratch/ns3-dsw/scripts/run.sh 
 
 * 电价优先  
 
-scratch/ns3-dsw/scripts/run.sh --enablePriceAwareScheduling 1 --loadDecayFactor 0.1 --maxCongestionPenalty 5 --congestionSensitivity 10 --maxProducerPenalty 0.1 --producerSensitivity 250 --logLevel all 
+bash scratch/ns3-dsw/scripts/run.sh --enablePriceAwareScheduling 1 --loadDecayFactor 0.1 --maxCongestionPenalty 5 --congestionSensitivity 10 --maxProducerPenalty 0.1 --producerSensitivity 250 --logLevel all 
 
 ```bash
  --logLevel all --enablePriceAwareScheduling 1 --loadDecayFactor 0.6 --maxCongestionPenalty 10 --congestionSensitivity 8 --maxProducerPenalty 1 --producerSensitivity 150
