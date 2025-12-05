@@ -145,7 +145,7 @@ class MetricsCalculator:
         if sched_df.empty:
             return {"error": "无法加载调度事件数据"}
 
-        # 解析XML文件（如果可用）
+        # 解析XML文件
         data_dir = self.loader.data_dir
         scheduler_file = data_dir / 'scheduler_events.xml'
 
@@ -179,7 +179,7 @@ class MetricsCalculator:
             else:
                 current_cost = current_processing = current_congestion = 0.0
 
-            # 获取SwitchTarget的Cost (可能不存在，特别是当decision="STAY")
+            # 获取SwitchTarget的Cost
             switch_target = event.find('SwitchTarget')
             if switch_target is not None:
                 switch_cost_elem = switch_target.find('Cost')
@@ -201,10 +201,10 @@ class MetricsCalculator:
                 'decision': decision,
                 'current_cost': current_cost,
                 'current_processing': current_processing,
-                'current_queue': current_congestion,  # 映射congestionCost到queuePenalty
+                'current_queue': current_congestion, 
                 'switch_cost': switch_cost,
                 'switch_processing': switch_processing,
-                'switch_queue': switch_congestion,  # 映射congestionCost到queuePenalty
+                'switch_queue': switch_congestion, 
                 'threshold': threshold,
                 'cost_diff': current_cost - switch_cost,  # 正值表示切换有收益
                 'processing_diff': current_processing - switch_processing,
