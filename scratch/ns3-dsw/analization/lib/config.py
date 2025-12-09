@@ -59,13 +59,13 @@ def configure_matplotlib():
         # ================= 3. 构建字体优先级列表 =================
         # Linux 和 Windows 的常见中文字体备选
         fallback_fonts = [
-            'WenQuanYi Micro Hei',   # Linux 常用
-            'WenQuanYi Zen Hei',     # Linux 常用
-            'Noto Sans CJK SC',      # Linux 现代发行版常用
-            'SimHei',                # Windows 黑体
-            'Microsoft YaHei',       # Windows 微软雅黑
-            'Arial Unicode MS',      # Mac 常用
-            'DejaVu Sans',           # 英文保底
+            'WenQuanYi Micro Hei',   
+            'WenQuanYi Zen Hei',     
+            'Noto Sans CJK SC',      
+            'SimHei',                
+            'Microsoft YaHei',       
+            'Arial Unicode MS',      
+            'DejaVu Sans',           
             'sans-serif'
         ]
 

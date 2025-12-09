@@ -20,7 +20,6 @@ NODE_COLORS = {
     'Core-2': '#6B8FB7',  # 蓝色 (Blue)
     'Core-6': '#D58C96',  # 橙色 (Orange)
     'Core-9': '#8FBC8F',  # 绿色 (Green)
-    # 兼容 Node ID (去除空格的键名)
     'Node2': '#6B8FB7',
     'Node6': '#D58C96',
     'Node9': '#8FBC8F',
@@ -181,12 +180,10 @@ def plot_stacked_area(pivot_df, output_path):
     plt.figure(figsize=(12, 6))
     
     # 3. 动态生成颜色列表
-    # 逻辑：先用完整列名查(如 'Node 2')，如果不行则去除空格查(如 'Node2')，最后用默认灰
     column_colors = []
     for col in normalized.columns:
         color = NODE_COLORS.get(col)
         if not color:
-            # 尝试去除空格匹配 ('Node 2' -> 'Node2')
             color = NODE_COLORS.get(col.replace(" ", ""))
         if not color:
             color = '#999999' # 默认灰色
@@ -240,29 +237,22 @@ def plot_link_utilization_heatmap(df, output_path):
     # 透视表: Index=LinkDir, Columns=Time, Values=UtilPct
     pivot = df.pivot(index='LinkDir', columns='Time', values='UtilPct').fillna(0)
     
-    # 尝试按链路ID自然排序 (L2 在 L10 之前)，并保持方向的稳定顺序
+    # 按链路ID自然排序
     try:
         temp_df = pivot.reset_index()
         
-        # 提取 'L' 后面的数字作为主要排序键，确保自然排序
-        # 使用 expand=False 和 errors='ignore' 来提高兼容性
         temp_df['sort_key_num'] = temp_df['LinkDir'].str.extract(r'L(\d+):', expand=False).astype(int, errors='ignore')
 
-        # 按 'sort_key_num' (数字) 和 'LinkDir' (字符串，作为次级排序键) 进行排序
         temp_df = temp_df.sort_values(by=['sort_key_num', 'LinkDir'])
         
-        # 移除临时键并重新设置索引
         pivot = temp_df.drop(columns='sort_key_num').set_index('LinkDir')
         
     except Exception as e:
-        # print(f"排序错误: {e}") # 调试用
-        pass # 保持默认排序
+        pass
 
     plt.figure(figsize=(14, 8))
     
     # 绘制热力图
-    # aspect='auto' 确保在长方形画布上铺满
-    # origin='lower' 确保列表的第一个元素在坐标轴底部 (或根据需求调整)
     plt.imshow(pivot.values, aspect='auto', cmap='plasma', vmin=0, vmax=100,
                extent=[pivot.columns.min(), pivot.columns.max(), 0, len(pivot.index)],
                origin='lower', interpolation='nearest')
@@ -286,7 +276,6 @@ def plot_price_per_MWh(data_dict, output_path):
     if not data_dict: return
 
     plt.figure(figsize=(12, 6))
-    # 无需定义局部的 colors 字典，直接使用全局的 NODE_COLORS
 
     for node_id, df in data_dict.items():
         if df.empty or 'price_per_MWh' not in df.columns: continue
